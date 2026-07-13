@@ -1,0 +1,111 @@
+institution,source_sector,canonical_sector,canonical_subsector
+DFC,Finance and Insurance,Financial Institutions,
+DFC,Utilities,Infrastructure,Energy & Utilities
+DFC,"Mining, Quarrying, and Oil and Gas Extraction",Extractives,
+DFC,Manufacturing,Manufacturing,
+DFC,Public Administration,Public Sector,
+DFC,Construction,Infrastructure,Construction
+DFC,Health Care and Social Assistance,Health & Education,Health
+DFC,Transportation and Warehousing,Infrastructure,Transport & Logistics
+DFC,Information,Digital & Telecom,
+DFC,Wholesale Trade,"Tourism, Retail & Property",Retail & Wholesale
+DFC,Accommodation and Food Services,"Tourism, Retail & Property",Hospitality
+DFC,"Agriculture, Forestry, Fishing and Hunting",Agribusiness & Food,Agriculture
+DFC,Educational Services,Health & Education,Education
+DFC,"Professional, Scientific, and Technical Services",Services,Professional Services
+DFC,Real Estate and Rental and Leasing,"Tourism, Retail & Property",Real Estate
+DFC,Retail Trade,"Tourism, Retail & Property",Retail & Wholesale
+DFC,Administrative and Support and Waste Management and Remediation Services,Services,Other Services
+DFC,Other Services (except Public Administration),Services,Other Services
+DFC,Management of Companies and Enterprises,Other / Multi-sector,
+DFC,Redacted,Undisclosed,
+IFC,Financial Markets,Financial Institutions,
+IFC,Funds,Investment Funds,
+IFC,Infrastructure,Infrastructure,
+IFC,Agribusiness and Forestry,Agribusiness & Food,
+IFC,Manufacturing,Manufacturing,
+IFC,"Tourism, Retail and Property","Tourism, Retail & Property",
+IFC,"Health, Education and Life Sciences",Health & Education,
+IFC,Telecommunications and Technology,Digital & Telecom,
+IFC,Metals and Mining,Extractives,Mining
+IFC,other,Other / Multi-sector,
+EBRD,Depository Credit (banks),Financial Institutions,Banking
+EBRD,Non-depository Credit (non-bank),Financial Institutions,Non-bank Finance
+EBRD,"Insurance, Pension, Mutual Funds",Financial Institutions,Insurance
+EBRD,Leasing Finance,Financial Institutions,Leasing
+EBRD,Equity Funds,Investment Funds,
+EBRD,Energy,Infrastructure,Energy & Utilities
+EBRD,Natural Resources,Extractives,
+EBRD,Food and Agribusiness,Agribusiness & Food,
+EBRD,Manufacturing & Services,Manufacturing,
+EBRD,Municipal & Env Inf,Infrastructure,Municipal & Environmental
+EBRD,Real Estate,"Tourism, Retail & Property",Real Estate
+EBRD,"Telecommunications, Media and Technology",Digital & Telecom,
+EBRD,Transport,Infrastructure,Transport & Logistics
+IDB Invest,Financial Institutions,Financial Institutions,
+IDB Invest,Instituciones financieras,Financial Institutions,
+IDB Invest,Investment Funds,Investment Funds,
+IDB Invest,Manufacturing,Manufacturing,
+IDB Invest,Agribusiness,Agribusiness & Food,
+IDB Invest,Agronegocios,Agribusiness & Food,
+IDB Invest,Energy,Infrastructure,Energy & Utilities
+IDB Invest,Transport,Infrastructure,Transport & Logistics
+IDB Invest,Water and Sanitation,Infrastructure,Water & Sanitation
+IDB Invest,Agua y saneamiento,Infrastructure,Water & Sanitation
+IDB Invest,Social Infrastructure,Health & Education,Social Infrastructure
+IDB Invest,Infraestructura social,Health & Education,Social Infrastructure
+IDB Invest,Digital Economy,Digital & Telecom,
+IDB Invest,Tourism,"Tourism, Retail & Property",Hospitality
+IDB Invest,Cambio climático,Other / Multi-sector,
+ADB,Small and medium enterprise finance and leasing,Financial Institutions,
+ADB,Inclusive finance,Financial Institutions,Microfinance
+ADB,Finance sector development,Financial Institutions,
+ADB,Banking systems and nonbank financial institutions,Financial Institutions,
+ADB,Housing finance,Financial Institutions,Non-bank Finance
+ADB,Trade finance,Financial Institutions,Trade Finance
+ADB,Infrastructure finance and investment funds,Financial Institutions,Non-bank Finance
+ADB,Finance sector development;Inclusive finance,Financial Institutions,
+ADB,Finance sector development;Infrastructure finance and investment funds,Financial Institutions,
+ADB,Energy efficiency and conservation;Finance sector development;Small and medium enterprise finance and leasing,Financial Institutions,
+ADB,Renewable energy generation - solar,Infrastructure,Energy & Utilities
+ADB,Renewable Energy Generation - Solar,Infrastructure,Energy & Utilities
+ADB,Renewable energy generation - wind,Infrastructure,Energy & Utilities
+ADB,Renewable Energy Generation - Wind,Infrastructure,Energy & Utilities
+ADB,Renewable energy generation - geothermal,Infrastructure,Energy & Utilities
+ADB,Renewable Energy Generation - Geothermal,Infrastructure,Energy & Utilities
+ADB,Renewable energy generation - biomass and waste,Infrastructure,Energy & Utilities
+ADB,Renewable energy generation - small hydro,Infrastructure,Energy & Utilities
+ADB,Renewable energy generation - solar;Renewable energy generation - wind,Infrastructure,Energy & Utilities
+ADB,Large hydropower generation,Infrastructure,Energy & Utilities
+ADB,Conventional energy generation,Infrastructure,Energy & Utilities
+ADB,Conventional energy generation; Energy efficiency and conservation,Infrastructure,Energy & Utilities
+ADB,Electricity transmission and distribution,Infrastructure,Energy & Utilities
+ADB,Energy efficiency and conservation,Infrastructure,Energy & Utilities
+ADB,Energy utility services,Infrastructure,Energy & Utilities
+ADB,Energy efficiency and conservation; Urban public transport,Infrastructure,
+ADB,Urban public transport,Infrastructure,Transport & Logistics
+ADB,Water transport (non-urban),Infrastructure,Transport & Logistics
+ADB,Air transport,Infrastructure,Transport & Logistics
+ADB,Rail transport (non-urban),Infrastructure,Transport & Logistics
+ADB,Road transport (non-urban),Infrastructure,Transport & Logistics
+ADB,ICT infrastructure;Multimodal logistics;Road transport (non-urban),Infrastructure,
+ADB,Urban water supply,Infrastructure,Water & Sanitation
+ADB,Urban sewerage,Infrastructure,Water & Sanitation
+ADB,Urban water supply; Urban sewerage,Infrastructure,Water & Sanitation
+ADB,Urban sanitation,Infrastructure,Water & Sanitation
+ADB,Urban solid waste management,Infrastructure,Municipal & Environmental
+ADB,Other urban services,Infrastructure,Municipal & Environmental
+ADB,"Agro-industry, marketing, and trade",Agribusiness & Food,
+ADB,Agricultural production,Agribusiness & Food,Agriculture
+ADB,Livestock,Agribusiness & Food,Agriculture
+ADB,Forestry,Agribusiness & Food,Forestry
+ADB,Agricultural production; Small and medium enterprise finance and leasing,Agribusiness & Food,
+ADB,Agricultural production; Banking systems and nonbank financial institutions,Agribusiness & Food,
+ADB,ICT infrastructure,Digital & Telecom,
+ADB,ICT industries and ICT-enabled services,Digital & Telecom,
+ADB,Oil and gas transmission and distribution,Extractives,Oil & Gas
+ADB,Health system development,Health & Education,Health
+ADB,Mother and child health care,Health & Education,Health
+ADB,Urban housing,"Tourism, Retail & Property",Real Estate
+ADB,Industry and trade sector development,Manufacturing,
+ADB,Large and medium industries,Manufacturing,

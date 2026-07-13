@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# Node / Next.js (web dashboard)
+web/node_modules/
+web/.next/
+web/out/
+
+# Bulky regenerable artifacts — the raw source archive stays local only
+data/raw/
+data/review_export.xlsx
+
+# Local tooling
+.claude/

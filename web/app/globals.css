@@ -1,0 +1,122 @@
+/* Chrome & ink tokens from the dataviz reference palette; dark mode is the
+   selected dark variants, not an automatic flip. */
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --border: rgba(11, 11, 11, 0.1);
+  --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #ffffff;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --border: rgba(255, 255, 255, 0.1);
+    --accent: #3987e5;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.shell { max-width: 1200px; margin: 0 auto; padding: 24px 20px 40px; }
+h1 { font-size: 24px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0 0 10px; color: var(--ink); }
+.sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }
+
+.filters {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-bottom: 16px;
+}
+.filters details { position: relative; }
+.filters summary {
+  list-style: none; cursor: pointer; user-select: none;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px; color: var(--ink-2);
+  white-space: nowrap;
+}
+.filters summary::-webkit-details-marker { display: none; }
+.filters details[open] summary { border-color: var(--accent); }
+.dropdown {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px; min-width: 220px; max-height: 280px;
+  overflow-y: auto; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+.dropdown label {
+  display: flex; gap: 8px; align-items: center; padding: 4px 6px;
+  border-radius: 6px; cursor: pointer; color: var(--ink-2);
+}
+.dropdown label:hover { background: var(--page); }
+.dropdown .clear {
+  display: block; width: 100%; margin-bottom: 6px; padding: 4px 6px;
+  background: none; border: none; text-align: left; cursor: pointer;
+  color: var(--accent); font: inherit;
+}
+.year-picks { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.year-picks select {
+  background: var(--surface); color: var(--ink-2);
+  border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px;
+  font: inherit;
+}
+.check {
+  display: flex; gap: 6px; align-items: center; color: var(--ink-2);
+  cursor: pointer; white-space: nowrap;
+}
+
+.tiles {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-bottom: 12px;
+}
+.tile {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+}
+.tile .label { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+.tile .value { font-size: 26px; font-weight: 650; }
+.note { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px; margin-bottom: 16px;
+}
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) {
+  .two-col { grid-template-columns: 1fr; }
+  .tiles { grid-template-columns: 1fr; }
+}
+
+.search {
+  width: 100%; padding: 8px 12px; margin-bottom: 10px;
+  background: var(--page); color: var(--ink);
+  border: 1px solid var(--border); border-radius: 8px; font: inherit;
+}
+.table-wrap { overflow-x: auto; max-height: 480px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th {
+  position: sticky; top: 0; background: var(--surface); text-align: left;
+  color: var(--muted); font-weight: 500; padding: 6px 10px;
+  border-bottom: 1px solid var(--grid); white-space: nowrap;
+}
+td {
+  padding: 6px 10px; border-bottom: 1px solid var(--grid);
+  color: var(--ink-2); vertical-align: top;
+}
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
