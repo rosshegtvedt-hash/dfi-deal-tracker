@@ -26,16 +26,33 @@ Each loader **replaces** its institution's rows, so rerunning is always safe
 — no duplicates. Steps 2 and 3 must rerun after any load (loads reset their
 institution's canonical sectors and the duplicate groups).
 
-## Dashboard
+## Dashboards
+
+There are two; they read the same database and show the same numbers.
+
+**Public dashboard (Next.js, in `/web`)** — the one to deploy on Vercel:
+
+```
+python export_web_data.py        # refresh web/public/data.json from the DB
+cd web
+npm run dev                      # local preview at http://localhost:3000
+```
+
+It is a static site: the pipeline exports `web/public/data.json` and the
+page filters it in the browser — no server or database hosting needed.
+**Refreshing the live site** after a data update: run the pipeline, run
+`python export_web_data.py`, then commit and push — Vercel redeploys
+automatically.
+
+**Local dashboard (Streamlit, in `/dashboard`)** — for private desk use:
 
 ```
 python -m streamlit run dashboard/app.py
 ```
 
 (Use `python -m streamlit`, not plain `streamlit` — the short command isn't
-on this machine's PATH.) Opens at <http://localhost:8501>; your browser
-usually opens automatically. Keep the terminal window open while using the
-dashboard; stop it with Ctrl+C. Sidebar filters cover
+on this machine's PATH.) Opens at <http://localhost:8501>. Keep the terminal
+window open while using it; stop with Ctrl+C. Sidebar filters cover
 institution, region, country, sector, instrument, and year range — all on
 the harmonized (canonical) fields. The "Exclude probable duplicates" toggle
 keeps one record per flagged co-financing group (the largest single
