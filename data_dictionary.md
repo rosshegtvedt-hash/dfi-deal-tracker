@@ -153,15 +153,40 @@ logged, never silently dropped or filled in.
 - Not in this file (NULL): region, es_category. `source_url` is constructed
   as https://www.adb.org/projects/&lt;project number&gt;/main.
 
+### AfDB (`scrapers/afdb.py`) — manual download
+
+- Source: MapAfrica projects CSV export, <https://mapafrica.afdb.org/en>
+  (bot-protected — download manually in a browser into `data/raw/` with a
+  name starting `afdb_mapafrica`; the loader reads the newest match).
+- Covers the **entire AfDB Group history (1967→)** and **both sovereign and
+  non-sovereign** operations — same treatment as EBRD's state operations:
+  the flag plus the funding window (ADF/ADB/Blend) are preserved in
+  `description` (e.g. "Sovereign operation; window: ADF").
+- Amounts are in **UA (Units of Account) = IMF SDR**, stored as
+  `currency='XDR'`; `amount_usd` converts at IMF annual-average
+  USD-per-SDR rates (see FX section). The IMF's online archive starts in
+  2003, so 1967–2002 approvals use the 2003 rate — logged per record as
+  `fx_rate_approximated`.
+- `es_category` holds AfDB's categorization: `Category 1` (highest risk) to
+  `Category 4`, or FI-A/B/C for financial intermediaries.
+- Not in this export (NULL): sponsor, prose description, instrument.
+  `source_url` is constructed as
+  `https://mapafrica.afdb.org/en/projects/46002-<project id>` (MapAfrica
+  shows a bot-check interstitial to automated fetchers; human clicks pass).
+
 ## Currency conversion (`fx_rates.csv` + `fx.py` + `update_fx_rates.py`)
 
-`fx_rates.csv` holds annual-average exchange rates to USD (currently EUR and
-GBP), computed from the ECB's official daily reference rates via the free
-frankfurter.app API. Regenerate with `python update_fx_rates.py` (run once a
-year, or when adding a currency). Loaders convert via `fx.to_usd(amount,
-currency, year)`; any fallback (pre-1999 years, missing years) is logged to
-`quality_issues` as `fx_rate_approximated` — conversions are never silently
-approximated.
+`fx_rates.csv` holds annual-average exchange rates to USD: EUR, GBP, MXN
+and BRL from the ECB's official daily reference rates (via the free
+frankfurter.app API, from 1999), and **XDR** (IMF Special Drawing Rights =
+AfDB's UA) from the IMF's official "Currency units per SDR" monthly archive
+(from 2003; annual figure = average of daily rates in Mar/Jun/Sep/Dec;
+already-fetched years are cached in the CSV and never re-fetched).
+Regenerate with `python update_fx_rates.py` (run once a year, or when
+adding a currency). Loaders convert via `fx.to_usd(amount, currency,
+year)`; any fallback (years before a currency's rate history, missing
+years) is logged to `quality_issues` as `fx_rate_approximated` —
+conversions are never silently approximated.
 
 ## Sector harmonization (`sector_mapping.csv` + `harmonize.py`)
 

@@ -27,6 +27,7 @@ INSTITUTION_COLORS = {
     "DFC": "#eda100",        # yellow
     "IDB Invest": "#008300", # green
     "ADB": "#4a3aa7",        # violet
+    "AfDB": "#e34948",       # red
 }
 GRID = "#e1e0d9"
 MUTED = "#898781"
@@ -255,10 +256,12 @@ st.caption(f"{len(table):,} deals shown.")
 with st.expander("Data notes"):
     st.markdown(
         """
-- **Coverage periods differ by institution.** IFC (from ~1994), EBRD (1991)
-  and IDB Invest (1989) disclose cumulative history including completed
-  deals; DFC's file covers currently-active projects only; ADB non-sovereign
-  covers 2004 onward. Cross-institution comparisons are most meaningful
+- **Coverage periods differ by institution.** IFC (from ~1994), EBRD (1991),
+  IDB Invest (1989) and AfDB (1967) disclose cumulative history including
+  completed deals; DFC's file covers currently-active projects only; ADB
+  non-sovereign covers 2004 onward. EBRD and AfDB include state/sovereign
+  operations (flagged in each record's description); the others are
+  private-sector only. Cross-institution comparisons are most meaningful
   within a recent year range.
 - **Amounts** are each institution's own commitment converted to US dollars
   (ECB annual-average rates for EUR and other covered currencies). Deals in
@@ -271,4 +274,5 @@ with st.expander("Data notes"):
 
 st.caption(
     "Source: public project disclosures of DFC, IFC (via WBG Finances One), "
-    "EBRD, IDB Invest and ADB · compiled by RCFH Advisory · DFI Deal Flow Tracker")
+    "EBRD, IDB Invest, ADB and AfDB (MapAfrica) · compiled by RCFH Advisory · "
+    "DFI Deal Flow Tracker")

@@ -8,10 +8,10 @@ import {
 
 // Fixed color per institution (dataviz reference palette, validated for both
 // modes). Color follows the entity — filtering never repaints survivors.
-const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB"];
+const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB"];
 const COLORS = {
-  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", ADB: "#4a3aa7" },
-  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", ADB: "#9085e9" },
+  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", ADB: "#4a3aa7", AfDB: "#e34948" },
+  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", ADB: "#9085e9", AfDB: "#e66767" },
 };
 const CHROME = {
   light: { grid: "#e1e0d9", muted: "#898781", ink2: "#52514e", surface: "#fcfcfb", bar: "#2a78d6" },
@@ -338,15 +338,19 @@ export default function Page() {
       <footer>
         <p>
           <strong>Notes:</strong> coverage periods differ by institution — IFC (~1994→),
-          EBRD (1991→) and IDB Invest (1989→) disclose cumulative history including completed
-          deals; DFC covers currently-active projects only; ADB non-sovereign covers 2004→.
-          Amounts are each institution&apos;s own commitment converted to US dollars (ECB
-          annual-average rates). Probable duplicates are fuzzy-matched co-financing leads;
-          the toggle keeps each group&apos;s largest single commitment.
+          EBRD (1991→), IDB Invest (1989→) and AfDB (1967→) disclose cumulative history
+          including completed deals; DFC covers currently-active projects only; ADB
+          non-sovereign covers 2004→. EBRD and AfDB include state/sovereign operations
+          (flagged per record); the others are private-sector only. Amounts are each
+          institution&apos;s own commitment converted to US dollars (ECB annual-average
+          rates; IMF SDR rates for AfDB&apos;s Units of Account). Probable duplicates are
+          fuzzy-matched co-financing leads; the toggle keeps each group&apos;s largest
+          single commitment.
         </p>
         <p>
           Source: public project disclosures of DFC, IFC (via WBG Finances One), EBRD,
-          IDB Invest and ADB · compiled by RCFH Advisory · DFI Deal Flow Tracker
+          IDB Invest, ADB and AfDB (MapAfrica) · compiled by RCFH Advisory · DFI Deal
+          Flow Tracker
         </p>
       </footer>
     </main>

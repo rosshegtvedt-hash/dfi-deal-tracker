@@ -16,6 +16,7 @@ python -m scrapers.ifc      # 1b. refresh IFC   (source updates daily)
 python -m scrapers.ebrd     # 1c. refresh EBRD  (annual release — see note below)
 python -m scrapers.idbinvest # 1d. refresh IDB Invest (feed always current)
 python -m scrapers.adb      # 1e. refresh ADB (needs manual download — see below)
+python -m scrapers.afdb     # 1f. refresh AfDB (needs manual download — see below)
 python harmonize.py         # 2. apply sector_mapping.csv -> canonical sectors
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
@@ -95,8 +96,12 @@ institution's own spelling and are not comparable across institutions.
   XLSX into `data\raw\` keeping a filename that starts with
   `adb-nonsov-products`, then run `python -m scrapers.adb` (it picks the
   newest matching file). ADB refreshes this dataset roughly annually.
+- **AfDB:** bot protection blocks automated download. In your browser, open
+  <https://mapafrica.afdb.org/en>, export the projects CSV, save it into
+  `data\raw\` with a filename starting `afdb_mapafrica`, then run
+  `python -m scrapers.afdb` (it picks the newest matching file).
 - **FX rates:** run `python update_fx_rates.py` once a year so the current
-  year's annual-average rates stay fresh.
+  year's annual-average rates stay fresh (ECB currencies + IMF SDR).
 - Raw downloads are archived date-stamped in `data/raw/` — never delete
   these; they're the audit trail.
 - Quality rules: bad rows are loaded with NULLs and logged to the

@@ -47,6 +47,43 @@ def fetch_annual_averages(currency: str) -> dict[int, float]:
     return {year: sum(vals) / len(vals) for year, vals in sorted(by_year.items())}
 
 
+# --- XDR (IMF Special Drawing Rights = AfDB's Unit of Account) -------------
+# The ECB doesn't publish SDR rates; the IMF's own monthly archive does
+# (from 2003). One request per sampled month, so already-fetched years are
+# cached in the existing CSV and never re-fetched.
+XDR_START_YEAR = 2003
+XDR_SAMPLE_MONTHS = ["03-31", "06-30", "09-30", "12-31"]
+XDR_SOURCE_NOTE = ("IMF 'Currency units per SDR' monthly archive (rms_mth.aspx), "
+                   "average of daily rates in Mar/Jun/Sep/Dec")
+IMF_URL = "https://www.imf.org/external/np/fin/data/rms_mth.aspx"
+UA_HEADER = {"User-Agent": "RCFH-Advisory DFI tracker (contact: rosshegtvedt@gmail.com)"}
+
+
+def read_existing_xdr() -> dict[int, float]:
+    """XDR rows already in fx_rates.csv — kept so we never re-fetch history."""
+    if not OUT_PATH.exists():
+        return {}
+    with open(OUT_PATH, newline="", encoding="utf-8-sig") as f:
+        return {int(r["year"]): float(r["usd_per_unit"])
+                for r in csv.DictReader(f) if r["currency"] == "XDR"}
+
+
+def fetch_xdr_year(year: int) -> float | None:
+    """Average the IMF's daily USD-per-SDR values across four sample months."""
+    values = []
+    for month_day in XDR_SAMPLE_MONTHS:
+        resp = requests.get(
+            IMF_URL, headers=UA_HEADER, timeout=60,
+            params={"SelectDate": f"{year}-{month_day}", "reportType": "CVSDR",
+                    "tsvflag": "Y"})
+        resp.raise_for_status()
+        for line in resp.text.splitlines():
+            if line.startswith("U.S. dollar"):
+                values += [float(v) for v in line.split("\t")[1:] if v.strip()]
+        time.sleep(0.6)
+    return sum(values) / len(values) if values else None
+
+
 def main():
     rows = []
     for currency in CURRENCIES:
@@ -58,6 +95,20 @@ def main():
         print(f"  {currency}: {len(averages)} years "
               f"({min(averages)}-{max(averages)})")
         time.sleep(1)
+
+    xdr = read_existing_xdr()
+    current_year = date.today().year
+    for year in range(XDR_START_YEAR, current_year + 1):
+        if year in xdr and year != current_year:  # current year refreshed each run
+            continue
+        print(f"Fetching XDR/USD {year} from IMF archive...")
+        rate = fetch_xdr_year(year)
+        if rate is not None:
+            xdr[year] = round(rate, 6)
+    for year, rate in sorted(xdr.items()):
+        rows.append({"currency": "XDR", "year": year,
+                     "usd_per_unit": rate, "source": XDR_SOURCE_NOTE})
+    print(f"  XDR: {len(xdr)} years ({min(xdr)}-{max(xdr)})")
 
     with open(OUT_PATH, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=["currency", "year", "usd_per_unit", "source"])
