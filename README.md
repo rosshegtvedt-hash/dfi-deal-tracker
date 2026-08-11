@@ -17,6 +17,9 @@ python -m scrapers.ebrd     # 1c. refresh EBRD  (annual release — see note bel
 python -m scrapers.idbinvest # 1d. refresh IDB Invest (feed always current)
 python -m scrapers.adb      # 1e. refresh ADB (needs manual download — see below)
 python -m scrapers.afdb     # 1f. refresh AfDB (needs manual download — see below)
+python -m scrapers.bii      # 1g. refresh BII (IATI feed always current)
+python -m scrapers.fmo      # 1h. refresh FMO (IATI feed always current)
+python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
 python harmonize.py         # 2. apply sector_mapping.csv -> canonical sectors
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
@@ -100,6 +103,20 @@ institution's own spelling and are not comparable across institutions.
   <https://mapafrica.afdb.org/en>, export the projects CSV, save it into
   `data\raw\` with a filename starting `afdb_mapafrica`, then run
   `python -m scrapers.afdb` (it picks the newest matching file).
+- **BII and FMO:** nothing to update — both IATI publications are refreshed
+  continuously and the loaders fetch them live each run. They share their
+  fetching/parsing plumbing via `scrapers/iati_common.py`.
+- **FMO caveat:** FMO's IATI feed covers the Dutch government funds it
+  manages, *not* FMO's own investment portfolio, and includes
+  technical-assistance contracts. See data_dictionary.md before using it in
+  cross-institution comparisons.
+- **Proparco:** nothing to update — AFD's open-data portal refreshes roughly
+  monthly and the loader fetches it live each run.
+- **Proparco caveat (important):** the source covers only projects signed
+  since 1 January 2014 **and** only those whose clients authorised
+  disclosure. Proparco totals are a **floor, never a complete picture**, and
+  must not be compared like-for-like with IFC/EBRD/AfDB totals without
+  saying so. See data_dictionary.md.
 - **FX rates:** run `python update_fx_rates.py` once a year so the current
   year's annual-average rates stay fresh (ECB currencies + IMF SDR).
 - Raw downloads are archived date-stamped in `data/raw/` — never delete

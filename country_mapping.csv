@@ -2,6 +2,168 @@ source_country,canonical_country,canonical_region
 Afghanistan,Afghanistan,South Asia
 Africa Region,Regional — Africa,Sub-Saharan Africa
 Africa Regional,Regional — Africa,Sub-Saharan Africa
+"Africa, regional",Regional — Africa,Sub-Saharan Africa
+"Asia, regional",Regional — Asia,Global / Multi-Region
+"Caribbean & Central America, regional",Regional — Latin America & Caribbean,Latin America & Caribbean
+"Congo (The Democratic Republic Of The)",DR Congo,Sub-Saharan Africa
+Côte D'Ivoire,Côte d'Ivoire,Sub-Saharan Africa
+"Developing countries, unspecified",Regional — Global,Global / Multi-Region
+"Eastern Africa, regional",Regional — Africa,Sub-Saharan Africa
+"North of Sahara, regional",Regional — Africa,Middle East & North Africa
+Philippines (The),Philippines,East Asia & Pacific
+"South Asia, regional",Regional — South Asia,South Asia
+"South of Sahara, regional",Regional — Africa,Sub-Saharan Africa
+"Southern Africa, regional",Regional — Africa,Sub-Saharan Africa
+Sudan (The),Sudan,Sub-Saharan Africa
+"Tanzania, The United Republic Of",Tanzania,Sub-Saharan Africa
+United Kingdom Of Great Britain And Northern Ireland (The),United Kingdom,Western Europe
+"Western Africa, regional",Regional — Africa,Sub-Saharan Africa
+Belgium,Belgium,Western Europe
+Bolivia (Plurinational State Of),Bolivia,Latin America & Caribbean
+Canada,Canada,North America
+Cayman Islands (The),Cayman Islands,Latin America & Caribbean
+Curaçao,Curaçao,Latin America & Caribbean
+Denmark,Denmark,Western Europe
+Finland,Finland,Western Europe
+Germany,Germany,Western Europe
+Guernsey,Guernsey,Western Europe
+Hong Kong,Hong Kong SAR,East Asia & Pacific
+Italy,Italy,Western Europe
+Jersey,Jersey,Western Europe
+Lao People'S Democratic Republic (The),Laos,East Asia & Pacific
+Luxembourg,Luxembourg,Western Europe
+Malta,Malta,Western Europe
+Moldova (The Republic Of),Moldova,Europe & Central Asia
+Netherlands (Kingdom Of The),Netherlands,Western Europe
+Norway,Norway,Western Europe
+"Palestine, State Of",West Bank and Gaza,Middle East & North Africa
+Spain,Spain,Western Europe
+United Arab Emirates (The),United Arab Emirates,Middle East & North Africa
+United States Of America (The),United States,North America
+Virgin Islands (British),British Virgin Islands,Latin America & Caribbean
+ARMENIE,Armenia,Europe & Central Asia
+Afrique du Sud,South Africa,Sub-Saharan Africa
+Albanie,Albania,Europe & Central Asia
+Algérie,Algeria,Middle East & North Africa
+Argentine,Argentina,Latin America & Caribbean
+Arménie,Armenia,Europe & Central Asia
+BANGLADESH,Bangladesh,South Asia
+BENIN,Benin,Sub-Saharan Africa
+BOTSWANA,Botswana,Sub-Saharan Africa
+Birmanie,Myanmar,East Asia & Pacific
+Bolivie,Bolivia,Latin America & Caribbean
+Bosnie-Herzégovine,Bosnia and Herzegovina,Europe & Central Asia
+Brésil,Brazil,Latin America & Caribbean
+COTE D IVOIRE,Côte d'Ivoire,Sub-Saharan Africa
+COTE D'IVOIRE,Côte d'Ivoire,Sub-Saharan Africa
+Cambodge,Cambodia,East Asia & Pacific
+Cameroun,Cameroon,Sub-Saharan Africa
+Cap-Vert,Cabo Verde,Sub-Saharan Africa
+Chili,Chile,Latin America & Caribbean
+Chine,China,East Asia & Pacific
+Colombie,Colombia,Latin America & Caribbean
+Congo-Kinshasa,DR Congo,Sub-Saharan Africa
+EQUATEUR,Ecuador,Latin America & Caribbean
+Egypte,Egypt,Middle East & North Africa
+"Egypte, Maroc",Regional — Africa,Middle East & North Africa
+Equateur,Ecuador,Latin America & Caribbean
+Ethiopie,Ethiopia,Sub-Saharan Africa
+GEORGIE,Georgia,Europe & Central Asia
+GHANA,Ghana,Sub-Saharan Africa
+GUINEE,Guinea,Sub-Saharan Africa
+"Ghana, Côte d'Ivoire",Regional — Africa,Sub-Saharan Africa
+"Ghana, Sénégal",Regional — Africa,Sub-Saharan Africa
+Guatémala,Guatemala,Latin America & Caribbean
+Guinée,Guinea,Sub-Saharan Africa
+Géorgie,Georgia,Europe & Central Asia
+Haïti,Haiti,Latin America & Caribbean
+INDE,India,South Asia
+Inde,India,South Asia
+Indonésie,Indonesia,East Asia & Pacific
+Irak,Iraq,Middle East & North Africa
+"Irak, Emirats arabes",Regional — Middle East,Middle East & North Africa
+Jamaïque,Jamaica,Latin America & Caribbean
+Jordanie,Jordan,Middle East & North Africa
+KAZAKHSTAN,Kazakhstan,Europe & Central Asia
+"Kenya, Ouganda",Regional — Africa,Sub-Saharan Africa
+Liban,Lebanon,Middle East & North Africa
+Libéria,Liberia,Sub-Saharan Africa
+MAROC,Morocco,Middle East & North Africa
+MAURICE,Mauritius,Sub-Saharan Africa
+MAURITANIE,Mauritania,Sub-Saharan Africa
+MEXIQUE,Mexico,Latin America & Caribbean
+MOZAMBIQUE,Mozambique,Sub-Saharan Africa
+MULTI-PAYS,Regional — Global,Global / Multi-Region
+"MULTI-PAYS, Afrique
+sub-saharienne",Regional — Africa,Sub-Saharan Africa
+Malaisie,Malaysia,East Asia & Pacific
+Malte,Malta,Western Europe
+Maroc,Morocco,Middle East & North Africa
+Maurice,Mauritius,Sub-Saharan Africa
+Mauritanie,Mauritania,Sub-Saharan Africa
+Mexique,Mexico,Latin America & Caribbean
+Moldavie,Moldova,Europe & Central Asia
+Mongolie,Mongolia,East Asia & Pacific
+Monténégro,Montenegro,Europe & Central Asia
+Multi-Pays,Regional — Global,Global / Multi-Region
+Multi-Pays AFA,Regional — Africa,Sub-Saharan Africa
+Multi-Pays AFN,Regional — Africa,Middle East & North Africa
+Multi-Pays AFO,Regional — Africa,Sub-Saharan Africa
+Multi-Pays AFR,Regional — Africa,Sub-Saharan Africa
+Multi-Pays AFS,Regional — Africa,Sub-Saharan Africa
+Multi-Pays ALC,Regional — Latin America & Caribbean,Latin America & Caribbean
+Multi-Pays ASI,Regional — Asia,Global / Multi-Region
+Multi-Pays Afrique,Regional — Africa,Sub-Saharan Africa
+Multi-Pays Amérique latine et Caraïbes,Regional — Latin America & Caribbean,Latin America & Caribbean
+Multi-Pays Etranger,Regional — Global,Global / Multi-Region
+Multi-Pays Méditerranée et Moyen-Orient,Regional — Middle East,Middle East & North Africa
+Multi-Pays Outre-mer,Regional — Global,Global / Multi-Region
+Multi-pays,Regional — Global,Global / Multi-Region
+Multi-pays Amérique latine et Caraïbes,Regional — Latin America & Caribbean,Latin America & Caribbean
+Multi-pays Asie,Regional — Asia,Global / Multi-Region
+Multi-pays Etranger,Regional — Global,Global / Multi-Region
+Multipays,Regional — Global,Global / Multi-Region
+NIGERIA,Nigeria,Sub-Saharan Africa
+Namibie,Namibia,Sub-Saharan Africa
+Nigéria,Nigeria,Sub-Saharan Africa
+Népal,Nepal,South Asia
+OUZBEKISTAN,Uzbekistan,Europe & Central Asia
+Ouganda,Uganda,Sub-Saharan Africa
+Ouzbekistan,Uzbekistan,Europe & Central Asia
+Ouzbékistan,Uzbekistan,Europe & Central Asia
+PAKISTAN,Pakistan,South Asia
+PANAMA,Panama,Latin America & Caribbean
+PARAGUAY,Paraguay,Latin America & Caribbean
+Palestine,West Bank and Gaza,Middle East & North Africa
+Panama / Salvador,Regional — Latin America & Caribbean,Latin America & Caribbean
+Pérou,Peru,Latin America & Caribbean
+RDC,DR Congo,Sub-Saharan Africa
+REPUBLIQUE DOMINICAINE,Dominican Republic,Latin America & Caribbean
+République Dominicaine,Dominican Republic,Latin America & Caribbean
+République dominicaine,Dominican Republic,Latin America & Caribbean
+République démocratique du Congo,DR Congo,Sub-Saharan Africa
+SENEGAL,Senegal,Sub-Saharan Africa
+SERBIE,Serbia,Europe & Central Asia
+Serbie,Serbia,Europe & Central Asia
+Sénégal,Senegal,Sub-Saharan Africa
+TERR.AUTO.PALES,West Bank and Gaza,Middle East & North Africa
+TUNISIE,Tunisia,Middle East & North Africa
+TURQUIE,Türkiye,Europe & Central Asia
+Tadjikistan,Tajikistan,Europe & Central Asia
+Tanzanie,Tanzania,Sub-Saharan Africa
+Tchad,Chad,Sub-Saharan Africa
+Terr.Auto.Pales,West Bank and Gaza,Middle East & North Africa
+Territoires autonomes palestiniens,West Bank and Gaza,Middle East & North Africa
+Thaïlande,Thailand,East Asia & Pacific
+"Thaïlande, Vietnam, Cambodge",Regional — East Asia & Pacific,East Asia & Pacific
+Tunisie,Tunisia,Middle East & North Africa
+Turquie,Türkiye,Europe & Central Asia
+VIET-NAM,Vietnam,East Asia & Pacific
+Viet-Nam,Vietnam,East Asia & Pacific
+ZIMBABWE,Zimbabwe,Sub-Saharan Africa
+Zambie,Zambia,Sub-Saharan Africa
+Égypte,Egypt,Middle East & North Africa
+Équateur,Ecuador,Latin America & Caribbean
 Albania,Albania,Europe & Central Asia
 Algeria,Algeria,Middle East & North Africa
 Angola,Angola,Sub-Saharan Africa

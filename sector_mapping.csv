@@ -120,3 +120,214 @@ AfDB,"Industry, Mining & Quarrying",Manufacturing,
 AfDB,Environment,Infrastructure,Municipal & Environmental
 AfDB,Communications,Digital & Telecom,
 AfDB,Urban Development,Infrastructure,Municipal & Environmental
+BII,"111 Education, Level Unspecified",Health & Education,Education
+BII,11120 Education facilities and training,Health & Education,Education
+BII,11220 Primary education,Health & Education,Education
+BII,11320 Upper Secondary Education (modified and includes data from 11322),Health & Education,Education
+BII,11420 Higher education,Health & Education,Education
+BII,"121 Health, General",Health & Education,Health
+BII,12191 Medical services,Health & Education,Health
+BII,12220 Basic health care,Health & Education,Health
+BII,210 Transport & Storage,Infrastructure,Transport & Logistics
+BII,21020 Road transport,Infrastructure,Transport & Logistics
+BII,21030 Rail transport,Infrastructure,Transport & Logistics
+BII,21061 Storage,Infrastructure,Transport & Logistics
+BII,22020 Telecommunications,Digital & Telecom,
+BII,230 ENERGY GENERATION AND SUPPLY,Infrastructure,Energy & Utilities
+BII,231 Energy Policy,Infrastructure,Energy & Utilities
+BII,"232 Energy generation, renewable sources",Infrastructure,Energy & Utilities
+BII,"23210 Energy generation, renewable sources - multiple technologies",Infrastructure,Energy & Utilities
+BII,23220 Hydro-electric power plants,Infrastructure,Energy & Utilities
+BII,23230 Solar energy for centralised grids,Infrastructure,Energy & Utilities
+BII,23240 Wind energy,Infrastructure,Energy & Utilities
+BII,23260 Geothermal energy,Infrastructure,Energy & Utilities
+BII,"23310 Energy generation, non-renewable sources, unspecified",Infrastructure,Energy & Utilities
+BII,23330 Oil-fired electric power plants,Infrastructure,Energy & Utilities
+BII,23340 Natural gas-fired electric power plants,Infrastructure,Energy & Utilities
+BII,23410 Hybrid energy electric power plants,Infrastructure,Energy & Utilities
+BII,240 Banking & Financial Services,Financial Institutions,
+BII,24020 Monetary institutions,Financial Institutions,Banking
+BII,24030 Formal sector financial intermediaries,Financial Institutions,
+BII,24040 Informal/semi-formal financial intermediaries,Financial Institutions,Microfinance
+BII,25020 Privatisation,Other / Multi-sector,
+BII,311 Agriculture,Agribusiness & Food,Agriculture
+BII,31130 Agricultural land resources,Agribusiness & Food,Agriculture
+BII,31162 Industrial crops/export crops,Agribusiness & Food,Agriculture
+BII,31163 Livestock,Agribusiness & Food,Agriculture
+BII,31191 Agricultural services,Agribusiness & Food,Agriculture
+BII,31193 Agricultural financial services,Agribusiness & Food,Agriculture
+BII,31194 Agricultural co-operatives,Agribusiness & Food,Agriculture
+BII,31220 Forestry development,Agribusiness & Food,Forestry
+BII,321 Industry,Manufacturing,
+BII,32120 Industrial development,Manufacturing,
+BII,32130 Small and medium-sized enterprises (SME) development,Other / Multi-sector,
+BII,32161 Agro-industries,Agribusiness & Food,
+BII,32164 Chemicals,Manufacturing,
+BII,32166 Cement/lime/plaster,Manufacturing,
+BII,32171 Engineering,Manufacturing,
+BII,43030 Urban development and management,Infrastructure,Municipal & Environmental
+BII,43032 Urban development,Infrastructure,Municipal & Environmental
+BII,998 Unallocated / Unspecified,Other / Multi-sector,
+BII,99810 Sectors not specified,Other / Multi-sector,
+BII,GICS 10 Energy,Investment Funds,Energy
+BII,GICS 15 Materials,Investment Funds,Materials
+BII,GICS 20 Industrials,Investment Funds,Industrials
+BII,GICS 25 Consumer Discretionary,Investment Funds,Consumer Discretionary
+BII,GICS 30 Consumer Staples,Investment Funds,Consumer Staples
+BII,GICS 40 Financials,Investment Funds,Financials
+BII,GICS 45 Information Technology,Investment Funds,Information Technology
+BII,GICS 151010 Chemicals,Manufacturing,
+BII,GICS 15101030 Fertilizers & Agricultural Chemicals,Manufacturing,
+BII,GICS 151020 Construction Materials,Manufacturing,
+BII,GICS 151050 Paper & Forest Products,Agribusiness & Food,Forestry
+BII,GICS 201050 Industrial Conglomerates,Manufacturing,
+BII,GICS 201060 Machinery,Manufacturing,
+BII,GICS 20201050 Environmental & Facilities Services,Infrastructure,Municipal & Environmental
+BII,GICS 20202010 Human Resource & Employment Services,Services,Professional Services
+BII,GICS 203040 Ground Transportation,Infrastructure,Transport & Logistics
+BII,GICS 20304040 Passenger Ground Transportation,Infrastructure,Transport & Logistics
+BII,GICS 203050 Transportation Infrastructure,Infrastructure,Transport & Logistics
+BII,GICS 251020 Automobiles,Manufacturing,
+BII,"GICS 252030 Textiles, Apparel & Luxury Goods",Manufacturing,
+BII,GICS 253020 Diversified Consumer Services,Services,Other Services
+BII,GICS 25302010 Education Services,Health & Education,Education
+BII,GICS 3010 Consumer Staples Distribution & Retail,"Tourism, Retail & Property",Retail & Wholesale
+BII,GICS 302020 Food Products,Agribusiness & Food,
+BII,GICS 30202010 Agricultural Products & Services,Agribusiness & Food,Agriculture
+BII,GICS 303010 Household Products,Manufacturing,
+BII,GICS 351020 Health Care Providers & Services,Health & Education,Health
+BII,GICS 351030 Health Care Technology,Health & Education,Health
+BII,GICS 352020 Pharmaceuticals,Health & Education,Health
+BII,GICS 4010 Banks,Financial Institutions,Banking
+BII,GICS 40101010 Diversified Banks,Financial Institutions,Banking
+BII,GICS 40201020 Diversified Financial Services,Financial Institutions,Non-bank Finance
+BII,GICS 40201040 Specialized Finance,Financial Institutions,Non-bank Finance
+BII,GICS 40201060 Transaction & Payment Processing Services,Financial Institutions,Non-bank Finance
+BII,GICS 402020 Consumer Finance,Financial Institutions,Non-bank Finance
+BII,GICS 451020 IT Services,Digital & Telecom,
+BII,GICS 451030 Software,Digital & Telecom,
+BII,"GICS 452020 Technology Hardware, Storage & Peripherals",Digital & Telecom,
+BII,GICS 501010 Diversified Telecommunication Services,Digital & Telecom,
+BII,GICS 501020 Wireless Telecommunication Services,Digital & Telecom,
+BII,GICS 551010 Electric Utilities,Infrastructure,Energy & Utilities
+BII,GICS 551040 Water Utilities,Infrastructure,Water & Sanitation
+BII,GICS 551050 Independent Power and Renewable Electricity Producers,Infrastructure,Energy & Utilities
+BII,GICS 55105010 Independent Power Producers & Energy Traders,Infrastructure,Energy & Utilities
+BII,GICS 55105020 Renewable Electricity,Infrastructure,Energy & Utilities
+BII,GICS 6020 Real Estate Management & Development,"Tourism, Retail & Property",Real Estate
+FMO,"23210 Energy generation, renewable sources - multiple technologies",Infrastructure,Energy & Utilities
+FMO,"23310 Energy generation, non-renewable sources, unspecified",Infrastructure,Energy & Utilities
+FMO,24030 Formal sector financial intermediaries,Financial Institutions,
+FMO,31193 Agricultural financial services,Agribusiness & Food,Agriculture
+FMO,43010 Multisector aid,Other / Multi-sector,
+Proparco,Agriculture et agro-industrie,Agribusiness & Food,
+Proparco,"Agriculture et agro-industrie, Climat",Agribusiness & Food,
+Proparco,"Agriculture et agro-industrie, Start-up et Numérique",Agribusiness & Food,
+Proparco,Agro-industrie et agriculture,Agribusiness & Food,
+Proparco,Assurances,Financial Institutions,Insurance
+Proparco,Autres secteurs,Other / Multi-sector,
+Proparco,"Autres secteurs, santé",Health & Education,Health
+Proparco,Banque & Institution financière,Financial Institutions,
+Proparco,Banque & Services financiers,Financial Institutions,
+Proparco,Banque et services financiers,Financial Institutions,
+Proparco,Banques & Institutions financières,Financial Institutions,
+Proparco,"Banques & Institutions financières, Start-up et Numérique",Financial Institutions,
+Proparco,Banques & Services financiers,Financial Institutions,
+Proparco,Banques & institutions financières,Financial Institutions,
+Proparco,Banques et Institutions financi,Financial Institutions,
+Proparco,Banques et Institutions financi.,Financial Institutions,
+Proparco,Banques et Services Financiers,Financial Institutions,
+Proparco,Banques et services financiers,Financial Institutions,
+Proparco,"COVID-19, Banques & Institutions financières",Financial Institutions,
+Proparco,"COVID-19, Microfinance",Financial Institutions,Microfinance
+Proparco,"Climat, Energie",Infrastructure,Energy & Utilities
+Proparco,"Climat, Energie, Start-up et Numérique",Infrastructure,Energy & Utilities
+Proparco,"Climat, Energie,Telecom",Infrastructure,Energy & Utilities
+Proparco,"Climat, Infrastructures",Infrastructure,
+Proparco,"Climat, Secteur financier",Financial Institutions,
+Proparco,Développement Urbain,Infrastructure,Municipal & Environmental
+Proparco,Energie,Infrastructure,Energy & Utilities
+Proparco,Energie renouvelable,Infrastructure,Energy & Utilities
+Proparco,"Energie, Start-up et Numérique",Infrastructure,Energy & Utilities
+Proparco,Energies renouvelables,Infrastructure,Energy & Utilities
+Proparco,"Energies renouvelables, Égalité socio-économique et territoriale",Infrastructure,Energy & Utilities
+Proparco,FII,Investment Funds,
+Proparco,Fonds,Investment Funds,
+Proparco,Fonds d'investissement,Investment Funds,
+Proparco,Fonds d'investissement Multi-Sec,Investment Funds,
+Proparco,Fonds d'investissement Multi-Secteurs,Investment Funds,
+Proparco,"Fonds d'investissement Multi-Secteurs, Start-up et Numérique",Investment Funds,
+Proparco,"Fonds d'investissement Multi-Secteurs, Égalité socio-économique et territoriale",Investment Funds,
+Proparco,Fonds d'investissement Mutli-Secteurs,Investment Funds,
+Proparco,Fonds d'investissement multi-secteurs,Investment Funds,
+Proparco,Immobilier,"Tourism, Retail & Property",Real Estate
+Proparco,Immobilier?,"Tourism, Retail & Property",Real Estate
+Proparco,Inconnu,Unclassified,
+Proparco,Industrie,Manufacturing,
+Proparco,Industrie et services,Manufacturing,
+Proparco,"Industrie et services, Start-up et Numérique",Manufacturing,
+Proparco,Industries,Manufacturing,
+Proparco,Industries (transport) / Aéroport,Infrastructure,Transport & Logistics
+Proparco,"Information, Communication et Autres services",Digital & Telecom,
+Proparco,"Infrastructure (transport, mine)",Infrastructure,Transport & Logistics
+Proparco,Infrastructure - Ville durable,Infrastructure,Municipal & Environmental
+Proparco,Infrastructures,Infrastructure,
+Proparco,Infrastructures (transport urbain),Infrastructure,Transport & Logistics
+Proparco,Infrastructures (transport),Infrastructure,Transport & Logistics
+Proparco,"Infrastructures (transport, mine), Start-up et Numérique",Infrastructure,Transport & Logistics
+Proparco,Infrastructures (transport/Port),Infrastructure,Transport & Logistics
+Proparco,Infrastructures (transports urbains),Infrastructure,Transport & Logistics
+Proparco,Infrastructures - Ville durable,Infrastructure,Municipal & Environmental
+Proparco,"Infrastructures - Ville durable, Energies renouvelables",Infrastructure,Municipal & Environmental
+Proparco,"Infrastructures - Ville durable, Égalité socio-économique et territoriale",Infrastructure,Municipal & Environmental
+Proparco,Infrastructures - ville durable,Infrastructure,Municipal & Environmental
+Proparco,Infrastructures et Energies renouvelables,Infrastructure,Energy & Utilities
+Proparco,Institutions Financières,Financial Institutions,
+Proparco,Institutions financières,Financial Institutions,
+Proparco,Institutions financières ?,Financial Institutions,
+Proparco,MAS,Other / Multi-sector,
+Proparco,MAS/Manufacturing,Manufacturing,
+Proparco,MIcrofinance,Financial Institutions,Microfinance
+Proparco,"Manufacturing, Agrobusiness and Services",Manufacturing,
+Proparco,Micro Finance,Financial Institutions,Microfinance
+Proparco,Microfinance,Financial Institutions,Microfinance
+Proparco,Microfinance et Assurance,Financial Institutions,Microfinance
+Proparco,"Microfinance, genre",Financial Institutions,Microfinance
+Proparco,"Microfinance, Égalité socio-économique et territoriale",Financial Institutions,Microfinance
+Proparco,"Microfinance, Égalité socio-économique et territoriale, COVID-19",Financial Institutions,Microfinance
+Proparco,Microfinances,Financial Institutions,Microfinance
+Proparco,Multi-Secteurs,Other / Multi-sector,
+Proparco,Multi-secteurs,Other / Multi-sector,
+Proparco,Multisecteurs,Other / Multi-sector,
+Proparco,Pharmaceutique,Health & Education,Health
+Proparco,Real estate / hospitality industry,"Tourism, Retail & Property",Real Estate
+Proparco,Santé,Health & Education,Health
+Proparco,"Santé, Banques & Institutions financières",Health & Education,Health
+Proparco,Secteur Sociaux - Santé,Health & Education,Health
+Proparco,Secteur financier,Financial Institutions,
+Proparco,Secteurs Sociaux - Education,Health & Education,Education
+Proparco,"Secteurs Sociaux - Education,  Start-up et Numérique",Health & Education,Education
+Proparco,"Secteurs Sociaux - Education, Start-up et Numérique",Health & Education,Education
+Proparco,Secteurs Sociaux - Santé,Health & Education,Health
+Proparco,"Secteurs Sociaux - Santé, COVID-19",Health & Education,Health
+Proparco,"Secteurs Sociaux - Santé, Start-up et Numérique",Health & Education,Health
+Proparco,Secteurs sociaux - Santé,Health & Education,Health
+Proparco,Services (Distribution),"Tourism, Retail & Property",Retail & Wholesale
+Proparco,"Services (Software), Start-up et Numérique",Digital & Telecom,
+Proparco,Services (Tourisme),"Tourism, Retail & Property",Hospitality
+Proparco,"Services (Tourisme), Start-up et Numérique","Tourism, Retail & Property",Hospitality
+Proparco,Services (logistiques),Infrastructure,Transport & Logistics
+Proparco,"Social and Inclusive Business, Start-up et numérique,Telecom",Digital & Telecom,
+Proparco,Start-up et numérique,Digital & Telecom,
+Proparco,Telecom,Digital & Telecom,
+Proparco,"Telecom, Start-up et Numérique",Digital & Telecom,
+Proparco,Tourisme et hébergement,"Tourism, Retail & Property",Hospitality
+Proparco,"Transition bas-carbone (énergie, mobilité électrique, efficacité énergétique, réseau électrique)",Infrastructure,Energy & Utilities
+Proparco,Transmission et Distribution,Infrastructure,Energy & Utilities
+Proparco,Télécom,Digital & Telecom,
+Proparco,Télécommunications,Digital & Telecom,
+Proparco,autres secteurs e-commerce,Digital & Telecom,
+Proparco,banques & Institutions financières,Financial Institutions,
+Proparco,infrastructures - Ville durable,Infrastructure,Municipal & Environmental
+Proparco,microfinance,Financial Institutions,Microfinance
+Proparco,multi-secteurs,Other / Multi-sector,

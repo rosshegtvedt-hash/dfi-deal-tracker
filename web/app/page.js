@@ -8,10 +8,26 @@ import {
 
 // Fixed color per institution (dataviz reference palette, validated for both
 // modes). Color follows the entity — filtering never repaints survivors.
-const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB"];
+// Every institution in the data — drives the filter, stats and table.
+const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB", "BII",
+                      "FMO", "Proparco"];
+
+// The categorical palette has exactly 8 slots and a 9th series never gets an
+// invented hue, so the stacked time series groups the two smallest — which are
+// also the two whose figures are least comparable (FMO publishes Dutch
+// government funds incl. TA contracts; Proparco covers only disclosure-consented
+// deals since 2014). Membership is fixed, so no filter can repaint a survivor.
+// Everything else on the page still shows all nine separately.
+const OTHER_SERIES = "Other (FMO, Proparco)";
+const FOLDED_INTO_OTHER = new Set(["FMO", "Proparco"]);
+const CHART_SERIES = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB", "BII",
+                      OTHER_SERIES];
+const seriesFor = (institution) =>
+  FOLDED_INTO_OTHER.has(institution) ? OTHER_SERIES : institution;
+
 const COLORS = {
-  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", ADB: "#4a3aa7", AfDB: "#e34948" },
-  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", ADB: "#9085e9", AfDB: "#e66767" },
+  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", ADB: "#4a3aa7", AfDB: "#e34948", BII: "#e87ba4", [OTHER_SERIES]: "#eb6834" },
+  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", ADB: "#9085e9", AfDB: "#e66767", BII: "#d55181", [OTHER_SERIES]: "#d95926" },
 };
 const CHROME = {
   light: { grid: "#e1e0d9", muted: "#898781", ink2: "#52514e", surface: "#fcfcfb", bar: "#2a78d6" },
@@ -19,8 +35,13 @@ const CHROME = {
 };
 const TABLE_LIMIT = 200;
 
-const fmtUSD = (v) =>
-  v == null ? "—" : Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(1)}B` : `$${(v / 1e6).toFixed(1)}M`;
+const fmtUSD = (v) => {
+  if (v == null) return "—";
+  const a = Math.abs(v);
+  if (a >= 1e12) return `$${(v / 1e12).toFixed(2)}T`;
+  if (a >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
+  return `$${(v / 1e6).toFixed(1)}M`;
+};
 const fmtBn = (v) => `$${v.toFixed(v >= 10 ? 0 : 1)}B`;
 
 function useDarkMode() {
@@ -140,7 +161,8 @@ export default function Page() {
       if (r.year == null || r.amount_usd == null) continue;
       if (!acc.has(r.year)) acc.set(r.year, { year: r.year });
       const bucket = acc.get(r.year);
-      bucket[r.institution] = (bucket[r.institution] || 0) + r.amount_usd / 1e9;
+      const key = seriesFor(r.institution);
+      bucket[key] = (bucket[key] || 0) + r.amount_usd / 1e9;
     }
     return [...acc.values()].sort((a, b) => a.year - b.year);
   }, [view]);
@@ -255,7 +277,7 @@ export default function Page() {
             <Tooltip {...tooltipStyle} formatter={(v, n) => [fmtBn(v), n]}
                      cursor={{ fill: chrome.grid, opacity: 0.35 }} />
             <Legend wrapperStyle={{ fontSize: 12, color: chrome.ink2 }} />
-            {INSTITUTIONS.map((i) => (
+            {CHART_SERIES.map((i) => (
               <Bar key={i} dataKey={i} stackId="a" fill={palette[i]}
                    stroke={chrome.surface} strokeWidth={1} />
             ))}
@@ -338,19 +360,27 @@ export default function Page() {
       <footer>
         <p>
           <strong>Notes:</strong> coverage periods differ by institution — IFC (~1994→),
-          EBRD (1991→), IDB Invest (1989→) and AfDB (1967→) disclose cumulative history
-          including completed deals; DFC covers currently-active projects only; ADB
-          non-sovereign covers 2004→. EBRD and AfDB include state/sovereign operations
-          (flagged per record); the others are private-sector only. Amounts are each
-          institution&apos;s own commitment converted to US dollars (ECB annual-average
-          rates; IMF SDR rates for AfDB&apos;s Units of Account). Probable duplicates are
-          fuzzy-matched co-financing leads; the toggle keeps each group&apos;s largest
-          single commitment.
+          EBRD (1991→), IDB Invest (1989→), AfDB (1967→) and BII (2003→) disclose
+          cumulative history including completed deals; DFC covers currently-active
+          projects only; ADB non-sovereign covers 2004→. EBRD and AfDB include
+          state/sovereign operations (flagged per record); the others are private-sector
+          only. <strong>Proparco&apos;s coverage is systematically incomplete</strong> —
+          AFD publishes only projects signed since 1 January 2014 whose clients
+          authorised disclosure, so its totals are a floor, not a complete picture.
+          Amounts are each institution&apos;s own commitment converted to US dollars
+          (ECB annual-average rates; IMF SDR rates for AfDB&apos;s Units of Account);
+          BII figures are lifetime commitment totals per activity rather than single
+          approvals. <strong>FMO here is not FMO&apos;s own investment portfolio</strong> —
+          its IATI publication covers the Dutch government funds it manages (MASSIF,
+          Building Prospects, AEF-I and others), including technical-assistance
+          contracts, so its counts and countries are not comparable with the other
+          institutions&apos;. Probable duplicates are fuzzy-matched co-financing leads;
+          the toggle keeps each group&apos;s largest single commitment.
         </p>
         <p>
           Source: public project disclosures of DFC, IFC (via WBG Finances One), EBRD,
-          IDB Invest, ADB and AfDB (MapAfrica) · compiled by RCFH Advisory · DFI Deal
-          Flow Tracker
+          IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI) and Proparco (AFD open
+          data) · compiled by RCFH Advisory · DFI Deal Flow Tracker
         </p>
       </footer>
     </main>

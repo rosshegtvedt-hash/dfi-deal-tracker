@@ -28,7 +28,17 @@ INSTITUTION_COLORS = {
     "IDB Invest": "#008300", # green
     "ADB": "#4a3aa7",        # violet
     "AfDB": "#e34948",       # red
+    "BII": "#e87ba4",        # magenta
 }
+# The palette has exactly 8 slots and a 9th series never gets an invented hue,
+# so the stacked time series groups the two smallest institutions — which are
+# also the two least comparable (FMO publishes Dutch government funds including
+# TA contracts; Proparco covers only disclosure-consented deals since 2014).
+# Membership is fixed, so filtering never repaints a survivor. Every other part
+# of the dashboard still shows all nine institutions separately.
+OTHER_SERIES = "Other (FMO, Proparco)"
+FOLDED_INTO_OTHER = {"FMO", "Proparco"}
+INSTITUTION_COLORS[OTHER_SERIES] = "#eb6834"  # orange
 GRID = "#e1e0d9"
 MUTED = "#898781"
 BAR_BLUE = "#2a78d6"  # single-hue for magnitude-only charts
@@ -69,6 +79,8 @@ def apply_dedupe(df: pd.DataFrame) -> pd.DataFrame:
 def money(value: float) -> str:
     if pd.isna(value):
         return "—"
+    if abs(value) >= 1e12:
+        return f"${value / 1e12:,.2f}T"
     if abs(value) >= 1e9:
         return f"${value / 1e9:,.1f}B"
     return f"${value / 1e6:,.1f}M"
@@ -154,6 +166,8 @@ inst_scale = alt.Scale(domain=list(INSTITUTION_COLORS),
 
 st.subheader("Commitments over time")
 by_year = (view.dropna(subset=["year", "amount_usd"])
+               .assign(institution=lambda d: d["institution"].where(
+                   ~d["institution"].isin(FOLDED_INTO_OTHER), OTHER_SERIES))
                .groupby(["year", "institution"], as_index=False)["amount_usd"].sum())
 by_year["amount_bn"] = by_year["amount_usd"] / 1e9
 year_chart = (
@@ -257,12 +271,26 @@ with st.expander("Data notes"):
     st.markdown(
         """
 - **Coverage periods differ by institution.** IFC (from ~1994), EBRD (1991),
-  IDB Invest (1989) and AfDB (1967) disclose cumulative history including
-  completed deals; DFC's file covers currently-active projects only; ADB
-  non-sovereign covers 2004 onward. EBRD and AfDB include state/sovereign
-  operations (flagged in each record's description); the others are
-  private-sector only. Cross-institution comparisons are most meaningful
-  within a recent year range.
+  IDB Invest (1989), AfDB (1967) and BII (2003) disclose cumulative history
+  including completed deals; DFC's file covers currently-active projects
+  only; ADB non-sovereign covers 2004 onward. EBRD and AfDB include
+  state/sovereign operations (flagged in each record's description); the
+  others are private-sector only. Cross-institution comparisons are most
+  meaningful within a recent year range.
+- **BII amounts are lifetime commitment totals** per activity (the sum of
+  all commitment transactions ever reported for it), not single approval
+  amounts like the other institutions'.
+- **Proparco coverage is systematically incomplete.** AFD's open data covers
+  only projects signed since 1 January 2014 *and* only those whose clients
+  authorised disclosure. Proparco totals here are a floor, never a complete
+  picture, and must not be compared like-for-like with IFC/EBRD/AfDB totals
+  without saying so.
+- **FMO here is not FMO's own investment portfolio.** Its IATI publication
+  covers the Dutch government funds FMO manages (MASSIF, Building
+  Prospects, AEF-I and others) and includes technical-assistance and
+  consultancy contracts, so its deal counts and recipient countries (led by
+  fund domiciles such as the US, Netherlands and Luxembourg) are not
+  comparable with the other institutions'. See data_dictionary.md.
 - **Amounts** are each institution's own commitment converted to US dollars
   (ECB annual-average rates for EUR and other covered currencies). Deals in
   currencies without ECB reference rates show no dollar amount.
@@ -274,5 +302,6 @@ with st.expander("Data notes"):
 
 st.caption(
     "Source: public project disclosures of DFC, IFC (via WBG Finances One), "
-    "EBRD, IDB Invest, ADB and AfDB (MapAfrica) · compiled by RCFH Advisory · "
-    "DFI Deal Flow Tracker")
+    "EBRD, IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI) and "
+    "Proparco (AFD open data) · compiled by RCFH Advisory · DFI Deal Flow "
+    "Tracker")

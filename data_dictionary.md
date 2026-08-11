@@ -174,6 +174,140 @@ logged, never silently dropped or filled in.
   `https://mapafrica.afdb.org/en/projects/46002-<project id>` (MapAfrica
   shows a bot-check interstitial to automated fetchers; human clicks pass).
 
+### BII (`scrapers/bii.py`)
+
+- Source: BII's own IATI publication (reporting org `GB-COH-03877777`),
+  served by the Code for IATI Datastore Classic. Fetching, the truncation
+  guard, date/country fallbacks and the d-portal link are shared with the
+  FMO loader in `scrapers/iati_common.py`. No API key, no bot
+  protection, refreshed continuously — nothing to update by hand.
+  The `stream=True` parameter is **required**: without it the API silently
+  returns only the first 50 rows, so the loader refuses to load any export
+  with implausibly few rows rather than overwriting good data.
+- **Amounts are lifetime commitment totals** (`total-Commitment` — the sum
+  of every commitment transaction ever reported for an activity), not
+  single approval amounts. BII figures are therefore not exactly comparable
+  like-for-like with the other institutions' per-approval amounts.
+  All rows are USD (currency read from `default-currency`, not assumed).
+- `approval_date` holds the activity's **start date** (`start-actual`,
+  falling back to `start-planned`) — IATI publishes no board-approval date.
+- Not in IATI's activity CSV, left NULL rather than inferred: `es_category`,
+  `instrument`, and `sponsor` — for sponsor, the Implementing-org field is
+  empty on every row and the Funding org is BII/CDC itself, so filling it
+  would stamp the funder's name on all 1,258 records. BII's `project_name`
+  carries the investee company or fund name instead.
+- **Countries:** 334 activities have no `recipient-country`. Where a
+  `recipient-region` is disclosed (e.g. "Africa, regional") that label is
+  used and `country_mapping.csv` resolves it to the same `Regional — ...`
+  values used for other institutions' regional deals; rows with neither
+  land on `Undisclosed`. Every such row is logged as `missing_country`
+  naming the region that stood in.
+- **Sectors — three vocabularies.** BII publishes under IATI sector
+  vocabulary 1 (OECD DAC 5-digit, 364 rows), 2 (DAC 3-digit category, 43
+  rows) and 99 (851 rows). Vocabulary 99 is BII's **own undocumented
+  scheme**; its codes have GICS structure (2/4/6/8 digits) and GICS
+  semantics, verified against investees (551050 on Globeleq/Gridworks,
+  4010 on NMB Bank/Tyme, 302020 on Africa Improved Foods, 15101030 on
+  Indorama Fertilizer). They are stored as `GICS <code> <name>` using the
+  name table in `scrapers/bii.py`. **This identification is ours, not
+  BII's** — the raw code is always kept in the stored value and every
+  mapping is reviewable in `sector_mapping.csv`. Note BII tags fund
+  commitments with a bare 2-digit GICS sector (~89% of those rows are
+  fund vehicles), so 2-digit codes map to canonical **Investment Funds**
+  with the GICS sector carried as the subsector; 4/6/8-digit codes map to
+  their industry. Source code `0` is BII's unclassified placeholder and is
+  loaded as NULL sector (→ `Unclassified`) with a logged issue.
+
+### FMO (`scrapers/fmo.py`)
+
+- Source: FMO's IATI publication (reporting org `NL-KVK-27078545`) via the
+  Code for IATI Datastore Classic — same mechanism, guard and shared
+  plumbing as BII (`scrapers/iati_common.py`). Nothing to update by hand.
+- **⚠ This is not FMO's own investment portfolio.** Every activity names
+  the *Ministry of Foreign Affairs of the Netherlands* as funder, and the
+  titles group into the Dutch government funds FMO manages: MASSIF (826),
+  Building Prospects (295), AEF-I (139), Mobilizing Finance for Forests
+  (20), LUF (13), DFCD (1). FMO's own ~EUR 12bn balance-sheet book is
+  published separately on fmo.nl and is **not** in this feed. Many rows are
+  technical-assistance/consultancy contracts (implementing orgs include
+  Accion, MicroFinanza Rating, Value for Women, Niras, Frankfurt School),
+  and the leading recipient countries are fund domiciles — United States
+  (142), Netherlands (141), Mauritius (85), UK (55), Luxembourg (38).
+  Read this institution as "Dutch government funds managed by FMO"; its
+  deal counts and geography are not like-for-like with the others.
+- **Currency — `default-currency` is wrong here and is deliberately not
+  used.** It reads EUR on all 1,294 rows, but the per-transaction
+  `currency` column reports 39 different currencies (EUR 653, USD 507, then
+  INR, KES, XOF, BDT, VND, KHR, UZS, TZS, UGX, …). Taking the EUR label at
+  face value would read 38.2bn Vietnamese dong as EUR 38.2bn: the raw
+  amount column sums to EUR 155.94bn against an actual programme size of
+  about USD 3.9bn. The loader reads the per-transaction `currency` and
+  converts with `fx.py`. The Datastore's `total-Commitment-USD` column is
+  not a usable alternative — it is a pass-through equal to the raw amount
+  for USD rows and 0 for every non-USD row.
+  129 rows are in currencies `fx_rates.csv` has no rate for; they keep
+  `amount_original` and get `amount_usd = NULL` plus `fx_rate_missing`.
+- **Titles:** 1,290 of 1,294 are internal fund identifiers
+  ("MASSIF-P00015696-001") rather than project names. Loaded verbatim and
+  flagged `title_is_internal_identifier`; nothing is prettified. The only
+  four real names are the fund-level parent activities.
+- **Descriptions:** the export's `description` column is the literal string
+  `"1"` on every row (a broken field) and is ignored. Text comes from
+  `description_general`; its 438 "Description not provided" placeholders are
+  stored as NULL and logged rather than saved as content.
+- `sponsor` = `participating-org (Implementing)`, populated on all rows —
+  for TA contracts this is the adviser, for investments the counterparty.
+- Not published, left NULL: `es_category`, `instrument`.
+
+### Proparco (`scrapers/proparco.py`)
+
+- Source: "Données de l'aide au développement de Proparco" on AFD's
+  open-data portal (opendata.afd.fr), via the Opendatasoft export API as
+  semicolon-delimited UTF-8-with-BOM. No API key; refreshes roughly monthly
+  and is fetched live each run. Proparco does **not** publish to IATI, so
+  this loader does not share `scrapers/iati_common.py`.
+- **⚠ COVERAGE IS SYSTEMATICALLY INCOMPLETE — the most important caveat in
+  this database.** The dataset contains only projects signed **since
+  1 January 2014**, and only those for which **the client granted disclosure
+  authorisation**. Deals whose clients declined are absent at any size.
+  Proparco totals are therefore a **FLOOR, never a complete picture**, and
+  must never be compared like-for-like with IFC / EBRD / AfDB totals without
+  stating this. (One 2009 signature appears despite the stated cut-off; it
+  is loaded as disclosed and logged as `outside_stated_coverage`.)
+- **One row is not in euros.** Activity CUG110502 (Centenary Bank EURIZ
+  guarantee, Uganda) carries 20,040,609,850 in the euro column — alone 56%
+  of Proparco's total and far beyond the institution's annual commitments.
+  The source's own `description_du_projet` says "une garantie EURIZ de 5
+  millions d'UGX (20 millions d'euros)", i.e. a EUR 20 **million** guarantee
+  recorded as EUR 20 **billion**, evidently left in Ugandan shillings.
+  Because the source text is self-contradictory about the true figure, the
+  loader does **not** correct it: the amount is stored NULL and logged as
+  `implausible_amount` with the original value preserved. The rule is a
+  magnitude threshold (`IMPLAUSIBLE_AMOUNT_EUR`, EUR 500m) rather than a
+  hardcoded row id — Proparco's largest genuine financing here is EUR 156m.
+- `es_category` comes from the `ces` column, confirmed to be Proparco's
+  environmental & social categorisation (its values read "IF-B : projet à
+  risque E&S modéré" etc.). Only the code is kept: A, B+, B, C, IF-A, IF-B,
+  IF-C, Z, or "Pas de classement". Two rows hold free-text commentary
+  instead of a category and are stored NULL and logged.
+- `status` (`etat_en_cours_ou_cloture`) is present on only 186 of 899 rows
+  and is free text ("En cours", "Clôturé", and longer notes); the remainder
+  stay NULL. `instrument` keeps the source's French terms (Prêt, Prise de
+  participation, Garantie, Subvention, …).
+- **French labels.** This is the only source in French. Every distinct
+  country spelling (122, including case, accent and multi-country variants
+  such as `Pérou`, `TURQUIE`, `Ghana, Sénégal`, `Multi-Pays AFO`) and every
+  sector spelling (111, including typos like `Mutli-Secteurs` and mixed
+  French/English) has an **explicit** row in `country_mapping.csv` /
+  `sector_mapping.csv`. Nothing is fuzzy-matched or case-folded in code.
+  AFD's internal multi-country desk codes (AFR/AFS/AFO/AFA/AFN) all resolve
+  to `Regional — Africa`; the finer geography behind them is not published.
+  Where a sector string combines a cross-cutting theme with a real sector
+  ("Climat, Energie"; "Microfinance, genre"), the theme is dropped and the
+  sector used.
+- Rows funded by FISEA (the Africa fund Proparco manages, 8 rows) are loaded
+  under `Proparco`.
+
 ## Currency conversion (`fx_rates.csv` + `fx.py` + `update_fx_rates.py`)
 
 `fx_rates.csv` holds annual-average exchange rates to USD: EUR, GBP, MXN
