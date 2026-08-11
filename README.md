@@ -66,6 +66,29 @@ table is searchable and links every row to its official disclosure page.
 The dashboard reads the database directly, so it always shows whatever the
 last pipeline run loaded.
 
+## Branded chart exports
+
+```
+python export_charts.py
+```
+
+Writes five LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
+time, top countries, sector mix, average ticket size, and co-financing pairs.
+Every chart is drawn inside one shared frame that stamps the RCFH Advisory
+wordmark and the **source attribution footer** — the footer belongs to the
+frame, not to each chart, so a published chart cannot lose it.
+
+Two things baked in deliberately:
+
+- Charts cover **2015–2024**. 2025 is excluded because DFC and ADB load from
+  dated snapshot files and contribute nothing to it, and FMO and BII lag —
+  including it would show a ~25% "collapse" in development finance that is an
+  artefact of publication timing, not the market.
+- The palette carries **six** categorical hues (the most that pass the
+  colour-vision and normal-vision separation checks together). The six
+  largest institutions get a fixed hue; the rest share a neutral "Other".
+  The dashboards use the same assignment, so exports and site agree.
+
 ## Reviewing the data
 
 - **Excel:** `python export_review.py` writes `data/review_export.xlsx`

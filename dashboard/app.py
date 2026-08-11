@@ -25,20 +25,20 @@ INSTITUTION_COLORS = {
     "IFC": "#2a78d6",         # blue
     "EBRD": "#1baf7a",        # aqua
     "DFC": "#eda100",         # yellow
-    "IDB Invest": "#008300",  # green
+    "BII": "#008300",         # green
     "EIB Global": "#4a3aa7",  # violet
     "AfDB": "#e34948",        # red
-    "BII": "#e87ba4",         # magenta
 }
-# The palette has exactly 8 slots and a 9th series never gets an invented hue,
-# so the stacked time series colours the SEVEN LARGEST institutions by
-# committed USD and groups the rest into a fixed "Other". Membership is
+# Only SIX categorical hues clear the CVD, normal-vision and lightness checks
+# together at all-pairs (verified with the dataviz validator; an 8-hue set
+# fails — magenta/orange are indistinguishable even with full colour vision,
+# and green/orange fail CVD). So the six largest institutions by committed USD
+# get a fixed hue each and the rest share a neutral "Other". Membership is
 # hardcoded rather than computed at runtime, so filtering never repaints a
-# survivor; it is revised only when a loader is added. Every other part of the
-# dashboard still shows all ten institutions separately.
-OTHER_SERIES = "Other (ADB, Proparco, FMO)"
-FOLDED_INTO_OTHER = {"ADB", "Proparco", "FMO"}
-INSTITUTION_COLORS[OTHER_SERIES] = "#eb6834"  # orange
+# survivor. Every other part of the dashboard still shows all ten separately.
+OTHER_SERIES = "Other DFIs"
+FOLDED_INTO_OTHER = {"IDB Invest", "ADB", "Proparco", "FMO"}
+INSTITUTION_COLORS[OTHER_SERIES] = "#898781"  # neutral, not a categorical hue
 GRID = "#e1e0d9"
 MUTED = "#898781"
 BAR_BLUE = "#2a78d6"  # single-hue for magnitude-only charts

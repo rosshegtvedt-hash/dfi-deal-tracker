@@ -12,22 +12,23 @@ import {
 const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB", "BII",
                       "FMO", "Proparco", "EIB Global"];
 
-// The categorical palette has exactly 8 slots and a 9th series never gets an
-// invented hue, so the stacked time series colours the SEVEN LARGEST
-// institutions by committed USD and groups the rest into a fixed "Other".
-// Membership is hardcoded (not computed at runtime), so filtering can never
-// repaint a survivor; it is revised only when a loader is added. Everything
-// else on the page still shows all ten institutions separately.
-const OTHER_SERIES = "Other (ADB, Proparco, FMO)";
-const FOLDED_INTO_OTHER = new Set(["ADB", "Proparco", "FMO"]);
+// Only SIX categorical hues clear the CVD, normal-vision and lightness checks
+// together at all-pairs (verified with the dataviz validator; an 8-hue set
+// fails — magenta/orange are indistinguishable even with full colour vision,
+// and green/orange fail CVD). So the six largest institutions by committed USD
+// get a fixed hue each and the rest share a neutral "Other". Membership is
+// hardcoded, not computed at runtime, so filtering can never repaint a
+// survivor. Everything else on the page still shows all ten separately.
+const OTHER_SERIES = "Other DFIs";
+const FOLDED_INTO_OTHER = new Set(["IDB Invest", "ADB", "Proparco", "FMO"]);
 const CHART_SERIES = ["IFC", "EBRD", "AfDB", "EIB Global", "BII", "DFC",
-                      "IDB Invest", OTHER_SERIES];
+                      OTHER_SERIES];
 const seriesFor = (institution) =>
   FOLDED_INTO_OTHER.has(institution) ? OTHER_SERIES : institution;
 
 const COLORS = {
-  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", "EIB Global": "#4a3aa7", AfDB: "#e34948", BII: "#e87ba4", [OTHER_SERIES]: "#eb6834" },
-  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", "EIB Global": "#9085e9", AfDB: "#e66767", BII: "#d55181", [OTHER_SERIES]: "#d95926" },
+  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", BII: "#008300", "EIB Global": "#4a3aa7", AfDB: "#e34948", [OTHER_SERIES]: "#898781" },
+  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", BII: "#008300", "EIB Global": "#9085e9", AfDB: "#e66767", [OTHER_SERIES]: "#898781" },
 };
 const CHROME = {
   light: { grid: "#e1e0d9", muted: "#898781", ink2: "#52514e", surface: "#fcfcfb", bar: "#2a78d6" },
