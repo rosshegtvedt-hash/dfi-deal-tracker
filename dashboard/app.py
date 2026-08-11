@@ -22,22 +22,22 @@ DB_PATH = Path(__file__).parent.parent / "data" / "dfi_tracker.db"
 # Fixed color per institution (dataviz reference palette, validated order).
 # Color follows the entity: filtering never repaints the survivors.
 INSTITUTION_COLORS = {
-    "IFC": "#2a78d6",        # blue
-    "EBRD": "#1baf7a",       # aqua
-    "DFC": "#eda100",        # yellow
-    "IDB Invest": "#008300", # green
-    "ADB": "#4a3aa7",        # violet
-    "AfDB": "#e34948",       # red
-    "BII": "#e87ba4",        # magenta
+    "IFC": "#2a78d6",         # blue
+    "EBRD": "#1baf7a",        # aqua
+    "DFC": "#eda100",         # yellow
+    "IDB Invest": "#008300",  # green
+    "EIB Global": "#4a3aa7",  # violet
+    "AfDB": "#e34948",        # red
+    "BII": "#e87ba4",         # magenta
 }
 # The palette has exactly 8 slots and a 9th series never gets an invented hue,
-# so the stacked time series groups the two smallest institutions — which are
-# also the two least comparable (FMO publishes Dutch government funds including
-# TA contracts; Proparco covers only disclosure-consented deals since 2014).
-# Membership is fixed, so filtering never repaints a survivor. Every other part
-# of the dashboard still shows all nine institutions separately.
-OTHER_SERIES = "Other (FMO, Proparco)"
-FOLDED_INTO_OTHER = {"FMO", "Proparco"}
+# so the stacked time series colours the SEVEN LARGEST institutions by
+# committed USD and groups the rest into a fixed "Other". Membership is
+# hardcoded rather than computed at runtime, so filtering never repaints a
+# survivor; it is revised only when a loader is added. Every other part of the
+# dashboard still shows all ten institutions separately.
+OTHER_SERIES = "Other (ADB, Proparco, FMO)"
+FOLDED_INTO_OTHER = {"ADB", "Proparco", "FMO"}
 INSTITUTION_COLORS[OTHER_SERIES] = "#eb6834"  # orange
 GRID = "#e1e0d9"
 MUTED = "#898781"
@@ -280,6 +280,12 @@ with st.expander("Data notes"):
 - **BII amounts are lifetime commitment totals** per activity (the sum of
   all commitment transactions ever reported for it), not single approval
   amounts like the other institutions'.
+- **EIB Global is a deliberate subset of EIB.** Only EIB's operations
+  outside the EU are loaded (8 non-EU regions, ~4,700 loan parts); the
+  22,863 EU loan parts are excluded as ordinary European lending rather
+  than development finance. Rows are **loan parts (tranches)**, not
+  projects — 4,722 tranches span 3,346 project numbers — so EIB Global's
+  deal count is not comparable with the others' project counts.
 - **Proparco coverage is systematically incomplete.** AFD's open data covers
   only projects signed since 1 January 2014 *and* only those whose clients
   authorised disclosure. Proparco totals here are a floor, never a complete
@@ -302,6 +308,6 @@ with st.expander("Data notes"):
 
 st.caption(
     "Source: public project disclosures of DFC, IFC (via WBG Finances One), "
-    "EBRD, IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI) and "
-    "Proparco (AFD open data) · compiled by RCFH Advisory · DFI Deal Flow "
-    "Tracker")
+    "EBRD, IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI), Proparco "
+    "(AFD open data) and EIB Global · compiled by RCFH Advisory · DFI Deal "
+    "Flow Tracker")

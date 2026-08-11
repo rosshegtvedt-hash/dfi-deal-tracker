@@ -20,6 +20,7 @@ python -m scrapers.afdb     # 1f. refresh AfDB (needs manual download — see be
 python -m scrapers.bii      # 1g. refresh BII (IATI feed always current)
 python -m scrapers.fmo      # 1h. refresh FMO (IATI feed always current)
 python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
+python -m scrapers.eib      # 1j. refresh EIB Global (live service)
 python harmonize.py         # 2. apply sector_mapping.csv -> canonical sectors
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
@@ -112,6 +113,10 @@ institution's own spelling and are not comparable across institutions.
   cross-institution comparisons.
 - **Proparco:** nothing to update — AFD's open-data portal refreshes roughly
   monthly and the loader fetches it live each run.
+- **EIB Global:** nothing to update — fetched live from EIB's own service.
+  Note it loads only EIB's **non-EU** operations (its EU lending is 5x
+  larger and is deliberately excluded), and its rows are **loan tranches**
+  rather than projects. See data_dictionary.md.
 - **Proparco caveat (important):** the source covers only projects signed
   since 1 January 2014 **and** only those whose clients authorised
   disclosure. Proparco totals are a **floor, never a complete picture**, and

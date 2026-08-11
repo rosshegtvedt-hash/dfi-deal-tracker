@@ -308,6 +308,42 @@ logged, never silently dropped or filled in.
 - Rows funded by FISEA (the Africa fund Proparco manages, 8 rows) are loaded
   under `Proparco`.
 
+### EIB Global (`scrapers/eib.py`)
+
+- Source: the JSON service behind EIB's financed-projects list
+  (<https://www.eib.org/en/projects/loans/>), keyless and paginated.
+  Refreshed continuously by EIB and fetched live each run.
+- **Scope is a deliberate subset, hence the name.** EIB's full book is
+  29,696 loan parts, of which **22,863 are inside the EU** — ordinary
+  European infrastructure lending, not development finance. The loader
+  requests only the eight non-EU regions EIB Global operates in
+  (enlargement, Western Balkans, Eastern and Southern Neighbourhood,
+  Sub-Saharan Africa, Latin America & Caribbean, Asia-Pacific, OCT),
+  excluding EFTA as high-income. Stored as `EIB Global`, not `EIB`, because
+  labelling it `EIB` would misrepresent an overwhelmingly European lender.
+- **Grain: one row is a LOAN PART (tranche), not a project.** 4,722 loan
+  parts span 3,346 project numbers; the Global Green Bond Initiative alone
+  has 24 tranches across Africa, Asia, Central Asia and Latin America with
+  different amounts. **Summing rows is correct** — they are separate
+  signatures — but EIB Global's *deal count* counts tranches and is not
+  comparable with other institutions' project counts. Verified that the
+  multi-region query does not duplicate rows and that identical tranches
+  recur within single-region queries too, so the repetition is EIB's own
+  data. Where a project has two or more tranches identical in amount, date
+  and country, they cannot be distinguished from a repeated record; those
+  are loaded as disclosed and flagged `identical_loan_parts`.
+- Amounts are published as formatted euro strings ("€44,000,000") and are
+  EUR on every row; converted via `fx.py` on the signature year.
+- `approval_date` is the **signature date** (EIB publishes no board-approval
+  date here). Dates run from 1969; pre-1970 values arrive as negative epoch
+  milliseconds, which `datetime.fromtimestamp` cannot represent on Windows,
+  so the loader converts with a timedelta from the epoch instead.
+- `region` holds EIB's own mandate region ("Africa, Caribbean, Pacific
+  countries + OCT", "Mediterranean countries", …) — the only source in the
+  database that populates the raw `region` column meaningfully.
+- Not published in this service, left NULL: `sponsor`, `instrument`,
+  `status`, `es_category`. 706 rows have no description (logged).
+
 ## Currency conversion (`fx_rates.csv` + `fx.py` + `update_fx_rates.py`)
 
 `fx_rates.csv` holds annual-average exchange rates to USD: EUR, GBP, MXN

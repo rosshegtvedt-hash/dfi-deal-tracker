@@ -10,24 +10,24 @@ import {
 // modes). Color follows the entity — filtering never repaints survivors.
 // Every institution in the data — drives the filter, stats and table.
 const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB", "BII",
-                      "FMO", "Proparco"];
+                      "FMO", "Proparco", "EIB Global"];
 
 // The categorical palette has exactly 8 slots and a 9th series never gets an
-// invented hue, so the stacked time series groups the two smallest — which are
-// also the two whose figures are least comparable (FMO publishes Dutch
-// government funds incl. TA contracts; Proparco covers only disclosure-consented
-// deals since 2014). Membership is fixed, so no filter can repaint a survivor.
-// Everything else on the page still shows all nine separately.
-const OTHER_SERIES = "Other (FMO, Proparco)";
-const FOLDED_INTO_OTHER = new Set(["FMO", "Proparco"]);
-const CHART_SERIES = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB", "BII",
-                      OTHER_SERIES];
+// invented hue, so the stacked time series colours the SEVEN LARGEST
+// institutions by committed USD and groups the rest into a fixed "Other".
+// Membership is hardcoded (not computed at runtime), so filtering can never
+// repaint a survivor; it is revised only when a loader is added. Everything
+// else on the page still shows all ten institutions separately.
+const OTHER_SERIES = "Other (ADB, Proparco, FMO)";
+const FOLDED_INTO_OTHER = new Set(["ADB", "Proparco", "FMO"]);
+const CHART_SERIES = ["IFC", "EBRD", "AfDB", "EIB Global", "BII", "DFC",
+                      "IDB Invest", OTHER_SERIES];
 const seriesFor = (institution) =>
   FOLDED_INTO_OTHER.has(institution) ? OTHER_SERIES : institution;
 
 const COLORS = {
-  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", ADB: "#4a3aa7", AfDB: "#e34948", BII: "#e87ba4", [OTHER_SERIES]: "#eb6834" },
-  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", ADB: "#9085e9", AfDB: "#e66767", BII: "#d55181", [OTHER_SERIES]: "#d95926" },
+  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", "EIB Global": "#4a3aa7", AfDB: "#e34948", BII: "#e87ba4", [OTHER_SERIES]: "#eb6834" },
+  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", "EIB Global": "#9085e9", AfDB: "#e66767", BII: "#d55181", [OTHER_SERIES]: "#d95926" },
 };
 const CHROME = {
   light: { grid: "#e1e0d9", muted: "#898781", ink2: "#52514e", surface: "#fcfcfb", bar: "#2a78d6" },
@@ -364,7 +364,10 @@ export default function Page() {
           cumulative history including completed deals; DFC covers currently-active
           projects only; ADB non-sovereign covers 2004→. EBRD and AfDB include
           state/sovereign operations (flagged per record); the others are private-sector
-          only. <strong>Proparco&apos;s coverage is systematically incomplete</strong> —
+          only. <strong>EIB Global is a deliberate subset of EIB</strong> — only its
+          operations outside the EU are included, and its rows are loan tranches
+          rather than projects, so its deal count is not comparable with the others.
+          <strong>Proparco&apos;s coverage is systematically incomplete</strong> —
           AFD publishes only projects signed since 1 January 2014 whose clients
           authorised disclosure, so its totals are a floor, not a complete picture.
           Amounts are each institution&apos;s own commitment converted to US dollars
@@ -379,8 +382,8 @@ export default function Page() {
         </p>
         <p>
           Source: public project disclosures of DFC, IFC (via WBG Finances One), EBRD,
-          IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI) and Proparco (AFD open
-          data) · compiled by RCFH Advisory · DFI Deal Flow Tracker
+          IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI), Proparco (AFD open
+          data) and EIB Global · compiled by RCFH Advisory · DFI Deal Flow Tracker
         </p>
       </footer>
     </main>
