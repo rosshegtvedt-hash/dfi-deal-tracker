@@ -1,136 +1,256 @@
 """
 scrapers/fmo.py — loads FMO (Nederlandse Financierings-Maatschappij voor
-Ontwikkelingslanden) activities from its IATI publication.
+Ontwikkelingslanden) investments from FMO's own project disclosure.
 
-Source: FMO's IATI data (reporting org NL-KVK-27078545) via the Code for
-IATI Datastore Classic. No API key; refreshed continuously; nothing to
-update by hand. Shares its fetching/date/country plumbing with
-scrapers/bii.py via scrapers/iati_common.py.
+Source: FMO's world map, https://www.fmo.nl/world-map — server-rendered,
+no API key, no bot protection, paginated 20 per page. The loader crawls it
+once per fund with a polite delay and merges the results.
 
 Run:
     python -m scrapers.fmo
 
-=============================== READ THIS ==================================
-WHAT THIS PUBLICATION ACTUALLY COVERS — it is NOT FMO's own investment book.
+================= WHY THIS REPLACED THE EARLIER IATI SOURCE ================
+This loader previously read FMO's IATI publication (NL-KVK-27078545). That
+publication does NOT contain FMO's own-account investments at all: every one
+of its activities belongs to a fund FMO manages on behalf of the Dutch
+state, and it reports them at transaction grain, down to technical-assistance
+line items of a few thousand dollars. The result was a tracker in which
+"FMO" meant MASSIF, Building Prospects and AEF-I only, with a median deal of
+about USD 0.3m and USD 1.9bn of volume across a decade — against an FMO
+committed portfolio of roughly EUR 13bn.
 
-Every one of the 1,294 activities names the *Ministry of Foreign Affairs of
-the Netherlands* as the funding organisation, and the activity titles group
-into the Dutch government funds FMO manages on the state's behalf:
-MASSIF (826), Building Prospects (295), AEF-I (139), Mobilizing Finance for
-Forests (20), LUF (13) and DFCD (1). FMO's own ~EUR 12bn balance-sheet
-portfolio is NOT in this feed — it is published separately on fmo.nl.
-
-Two consequences worth keeping in mind before quoting these numbers:
-  * The implementing organisations are frequently advisers and rating
-    agencies (Accion, MicroFinanza Rating, Value for Women, Niras, Frankfurt
-    School), i.e. many rows are technical-assistance and consultancy
-    contracts rather than investments.
-  * The recipient countries are led by the United States, the Netherlands,
-    Mauritius, the UK and Luxembourg — fund domiciles and contracting
-    locations, not investment destinations.
-Treat this institution as "Dutch government funds managed by FMO", and see
-data_dictionary.md before using it in published comparisons.
+FMO's world map publishes both: its own account (fund "FMO") and the
+programme funds, each project tagged with the fund(s) financing it. This
+loader keeps all of them and records the fund on every row, so own-account
+lending can be separated from money FMO merely administers.
 ============================================================================
 
-Field mapping (source column -> our schema):
-    title                             -> project_name (see title note below)
-    description_general               -> description (see description note)
-    recipient-country, else
-      recipient-region                -> country
-    sector-code + sector              -> sector (names populated on all rows)
-    total-Commitment                  -> amount_original
-    currency  (NOT default-currency)  -> currency (see the currency note)
-    start-actual                      -> approval_date (activity start; IATI
-                                         publishes no board-approval date)
-    activity-status-code              -> status
-    participating-org (Implementing)  -> sponsor
-    iati-identifier                   -> source_url (d-portal activity page)
+FUNDS — the `Funding` filter on the world map, and the codes it posts:
+    FMO (2)                             — FMO's OWN ACCOUNT
+    Access to Energy Fund (1)           — Dutch government programme funds
+    Building Prospects (4)                and other managed vehicles
+    DFCD (12)
+    MASSIF (5)
+    Mobilising Finance for Forests (14)
+    Other funding (16)
+    Ventures Program (13)
 
-CURRENCY — the one thing that must not be taken at face value here.
-`default-currency` says EUR on all 1,294 rows, but the amounts are NOT all
-euros: the per-transaction `currency` column reports 39 different currencies
-(EUR 653, USD 507, then INR, KES, XOF, BDT, VND, KHR, UZS, TZS, UGX and
-more). Trusting `default-currency` would read 38.2 billion Vietnamese dong
-as EUR 38.2 billion and inflate the whole database by ~USD 170bn — the raw
-column sums to EUR 155.94bn against a real programme size two orders of
-magnitude smaller. This loader therefore reads the per-transaction
-`currency` column and converts with fx.py.
+A project can be financed by more than one fund, so the loader crawls each
+fund, merges on FMO's project id, and unions the fund names. Every project
+appears ONCE, and `description` carries "Fund: FMO" or "Funds: FMO; MASSIF"
+— the same treatment scrapers/afdb.py gives AfDB's sovereign/window flags.
+To isolate FMO's own book, filter to rows whose description names the FMO
+fund.
 
-The Datastore's own `total-Commitment-USD` column is no help: it is a
-pass-through that equals the raw amount for rows already in USD and is 0 for
-every non-USD row, so it cannot be used as a conversion source either.
+PAGINATION IS NOT STABLE. The same crawl returns some projects on two pages
+and misses others: one pass over the unfiltered list yields 1,308 cards but
+only ~1,288 distinct projects. The loader therefore crawls every fund view
+AND the unfiltered list and unions them on project id, which recovers ~1,440
+distinct investments — materially more than any single pass. Anything found
+only in the unfiltered list has no fund attribution; it is loaded with
+"Fund: not stated" and logged as 'fund_not_stated' rather than being guessed
+into a fund.
 
-fx_rates.csv covers EUR, GBP, MXN, BRL and XDR, so EUR/USD/GBP/MXN rows
-convert and the ~130 rows in currencies we hold no rate for keep their
-amount_original but get amount_usd = NULL plus a logged 'fx_rate_missing'
-issue — the same treatment IDB Invest's COP/PEN deals get.
+Field mapping (world-map card -> our schema):
+    ProjectList__projectTitle           -> project_name
+    "Fund: ..." (derived, see above)    -> description
+    "Country: ..."                      -> country
+    "Sector: ..."                       -> sector (FMO's four sectors)
+    "<CUR> <n> MLN" (title='Total FMO
+      financing')                       -> amount_original + currency,
+                                           converted via fx.py on the
+                                           disclosure year
+    "Date: M/D/YYYY"                    -> approval_date
+    status span                         -> status
+    project-detail link                 -> source_url
 
-TITLES: 3 in 4 titles are internal fund identifiers ("MASSIF-P00015696-001")
-rather than project names. They are loaded verbatim and flagged as
-'title_is_internal_identifier'; nothing is prettified or invented.
+AMOUNTS are FMO's own financing for the project ("Total FMO financing"),
+published in the deal's currency — mostly USD and EUR but also ZAR, INR and
+others. Currencies fx_rates.csv has no rate for keep amount_original and get
+amount_usd = NULL plus a logged 'fx_rate_missing', as elsewhere.
 
-DESCRIPTIONS: the export's `description` column is the literal string "1" on
-all 1,294 rows (a broken field in the publication) and is ignored entirely.
-Real text lives in `description_general`, where the placeholder "Description
-not provided" is stored as NULL and logged rather than saved as content.
+DATES are the disclosure date shown on the card, which is FMO's publication
+date for the investment rather than a board-approval date.
 
-NOT PUBLISHED, left NULL rather than inferred: es_category, instrument.
+NOT PUBLISHED on the card, left NULL rather than inferred: instrument,
+sponsor, es_category.
 """
 
+import html as html_lib
 import re
 import sys
+import time
+from datetime import date, datetime
 from pathlib import Path
+
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from database import get_connection, log_quality_issue, utc_now  # noqa: E402
 from fx import to_usd  # noqa: E402
-from scrapers.iati_common import (  # noqa: E402
-    ACTIVITY_STATUS, DATASTORE_URL, activity_date, clean,
-    download_activity_csv, dportal_url, read_activity_csv, resolve_country,
-    snapshot_row)
 
 INSTITUTION = "FMO"
-REPORTING_ORG = "NL-KVK-27078545"
-DATA_URL = DATASTORE_URL.format(org=REPORTING_ORG)
+BASE_URL = "https://www.fmo.nl/world-map"
 RAW_DIR = Path(__file__).parent.parent / "data" / "raw"
+UA_HEADER = {"User-Agent": "RCFH-Advisory DFI tracker (contact: rosshegtvedt@gmail.com)"}
+DELAY_SECONDS = 0.7
+PAGE_LIMIT = 200          # stop runaway pagination if the markup ever changes
 
-# FMO's internal scheme: "<fund>-P<8 digits>-<seq>", e.g. MASSIF-P00015696-001.
-INTERNAL_ID_RE = re.compile(r"-P\d{5,}-\d+$")
+OWN_ACCOUNT_FUND = "FMO"
+FUNDS = {
+    "2": OWN_ACCOUNT_FUND,
+    "1": "Access to Energy Fund",
+    "4": "Building Prospects",
+    "12": "DFCD",
+    "5": "MASSIF",
+    "14": "Mobilising Finance for Forests",
+    "16": "Other funding",
+    "13": "Ventures Program",
+}
 
-DESCRIPTION_PLACEHOLDER = "description not provided"
+# The whole disclosure is ~1,300 projects; anything far below that means the
+# crawl or the markup broke, and loading it would replace good data with a
+# fragment.
+MIN_EXPECTED_PROJECTS = 800
 
-
-def download() -> Path:
-    return download_activity_csv(REPORTING_ORG, "fmo_iati_activities", RAW_DIR)
-
-
-def build_sector(row):
-    """'24030 Formal sector financial intermediaries' — code kept alongside
-    the name, matching the format used for BII's DAC-coded rows."""
-    code = clean(row.get("sector-code"))
-    name = clean(row.get("sector"))
-    if code and name:
-        return f"{code} {name}", None
-    if code:
-        return code, f"sector-code {code} has no name in the export"
-    if name:
-        return name, "sector name given without a sector-code"
-    return None, "no sector code or name given"
-
-
-def build_description(row):
-    """Return (description_or_None, note_or_None)."""
-    value = clean(row.get("description_general"))
-    if value is None:
-        return None, "description_general is blank"
-    if value.strip().lower() == DESCRIPTION_PLACEHOLDER:
-        return None, ("description_general is the placeholder 'Description not "
-                      "provided'; stored as NULL rather than as text")
-    return value, None
+ITEM_RE = re.compile(
+    r"<li class='ProjectList__item'[^>]*data-project-id='(?P<pid>\d+)'>.*?"
+    r"href='(?P<url>[^']+)'.*?"
+    r"<h3 class='ProjectList__projectTitle'>(?P<title>.*?)</h3>(?P<extras>.*?)</li>",
+    re.S)
+SPAN_RE = re.compile(r"<span[^>]*>(.*?)</span>", re.S)
+AMOUNT_RE = re.compile(r"^([A-Z]{3})\s+([\d,]+(?:\.\d+)?)\s+MLN$")
+TAGS_RE = re.compile(r"<[^>]+>")
 
 
-def load(path: Path) -> None:
-    df = read_activity_csv(path)
+def strip_tags(text):
+    """Card text without markup. Entities are unescaped so country names
+    arrive as "Côte d'Ivoire", not "Côte d&#039;Ivoire"."""
+    return html_lib.unescape(TAGS_RE.sub("", text or "")).strip()
+
+
+def parse_page(html):
+    """Cards on one results page -> list of dicts."""
+    out = []
+    for m in ITEM_RE.finditer(html):
+        spans = [s for s in (strip_tags(x) for x in SPAN_RE.findall(m.group("extras"))) if s]
+        rec = {"id": m.group("pid"), "url": m.group("url"),
+               "title": strip_tags(m.group("title")),
+               "amount": None, "currency": None, "date": None,
+               "country": None, "sector": None, "status": None}
+        for span in spans:
+            amount = AMOUNT_RE.match(span)
+            if amount:
+                rec["currency"] = amount.group(1)
+                rec["amount"] = float(amount.group(2).replace(",", "")) * 1_000_000
+            elif span.startswith("Date:"):
+                rec["date"] = span.split(":", 1)[1].strip()
+            elif span.startswith("Country:"):
+                rec["country"] = span.split(":", 1)[1].strip() or None
+            elif span.startswith("Sector:"):
+                rec["sector"] = span.split(":", 1)[1].strip() or None
+            else:
+                rec["status"] = span
+        out.append(rec)
+    return out
+
+
+def make_session():
+    """fmo.nl drops the occasional connection during a long crawl, so retry
+    with backoff rather than losing the run."""
+    session = requests.Session()
+    session.headers.update(UA_HEADER)
+    retry = Retry(total=5, backoff_factor=1.5,
+                  status_forcelist=[429, 500, 502, 503, 504],
+                  allowed_methods=["GET"])
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    return session
+
+
+def get_page(session, code, page, attempts=4):
+    """One results page, retrying connection resets the adapter can't catch."""
+    params = {"page": page}
+    if code is not None:
+        params["fund[]"] = code
+    for attempt in range(attempts):
+        try:
+            return session.get(BASE_URL, timeout=120, params=params)
+        except requests.exceptions.ConnectionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(3 * (attempt + 1))
+    raise RuntimeError("unreachable")
+
+
+def crawl_fund(session, code, name):
+    """Every project in one view (a fund, or the whole list when code is None)."""
+    found, page = [], 1
+    while page <= PAGE_LIMIT:
+        resp = get_page(session, code, page)
+        # Paging past the last page 404s rather than returning an empty list.
+        if resp.status_code == 404:
+            break
+        resp.raise_for_status()
+        items = parse_page(resp.text)
+        if not items:
+            break
+        found.extend(items)
+        page += 1
+        time.sleep(DELAY_SECONDS)
+    print(f"  {name:<32} {len(found):>5} projects")
+    return found
+
+
+def fetch_all():
+    """Crawl each fund plus the unfiltered list, merging on project id.
+
+    The world map's paginated result set is NOT stable between requests —
+    a single unfiltered crawl returns the same project on two pages ~16
+    times and misses others. Crawling each (shorter) fund view as well and
+    unioning by project id recovers materially more of the disclosure than
+    any single pass: ~1,440 projects against the ~1,290 distinct ones a
+    plain crawl of the full list yields.
+    """
+    session = make_session()
+    projects = {}
+    views = [(code, name) for code, name in FUNDS.items()] + [(None, "(all funds)")]
+    for code, name in views:
+        for rec in crawl_fund(session, code, name):
+            existing = projects.setdefault(rec["id"], {**rec, "funds": []})
+            if code is not None and name not in existing["funds"]:
+                existing["funds"].append(name)
+    return list(projects.values())
+
+
+def archive(projects):
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    import json
+    dest = RAW_DIR / f"fmo_worldmap_{date.today().isoformat()}.json"
+    dest.write_text(json.dumps(projects, indent=1, ensure_ascii=False),
+                    encoding="utf-8")
+    print(f"Archived {len(projects)} projects to {dest.name}")
+
+
+def parse_date(value):
+    """'7/27/2026' -> ISO. Returns (iso_or_None, note_or_None)."""
+    if not value:
+        return None, "no date on the card"
+    try:
+        return datetime.strptime(value, "%m/%d/%Y").date().isoformat(), None
+    except ValueError:
+        return None, f"unparseable date {value!r}"
+
+
+def load(projects) -> None:
+    if len(projects) < MIN_EXPECTED_PROJECTS:
+        raise SystemExit(
+            f"Only {len(projects)} projects crawled — the world map's markup or "
+            "pagination has probably changed. Refusing to load; check the parser.")
+
+    own = sum(1 for p in projects if OWN_ACCOUNT_FUND in p["funds"])
+    print(f"{len(projects)} projects ({own} on FMO's own account)")
 
     conn = get_connection()
     scraped_at = utc_now()
@@ -139,84 +259,54 @@ def load(path: Path) -> None:
         conn.execute("DELETE FROM projects WHERE institution = ?", (INSTITUTION,))
         conn.execute("DELETE FROM quality_issues WHERE institution = ?", (INSTITUTION,))
 
-        for _, row in df.iterrows():
-            raw = snapshot_row(row)
-
-            # --- title ------------------------------------------------------
-            name = clean(row.get("title"))
+        for p in projects:
+            name = p["title"] or None
             if name is None:
                 log_quality_issue(conn, INSTITUTION, None, "missing_project_name",
-                                  "title is blank", raw)
+                                  "card has no title", p)
                 issues += 1
-            elif INTERNAL_ID_RE.search(name):
+
+            funds = p["funds"]
+            if funds:
+                label = "Fund" if len(funds) == 1 else "Funds"
+                description = f"{label}: {'; '.join(funds)}"
+            else:
+                # Present in the full list but under no fund filter.
+                description = "Fund: not stated"
                 log_quality_issue(
-                    conn, INSTITUTION, name, "title_is_internal_identifier",
-                    f"title {name!r} is an internal fund identifier, not a project "
-                    "name; loaded verbatim", raw)
+                    conn, INSTITUTION, name, "fund_not_stated",
+                    "the world map lists this investment but it appears under no "
+                    "fund filter, so it cannot be attributed to FMO's own account "
+                    "or to a managed programme fund", p)
                 issues += 1
 
-            # --- country ----------------------------------------------------
-            country, country_note = resolve_country(row)
-            if country_note:
-                log_quality_issue(conn, INSTITUTION, name, "missing_country",
-                                  country_note, raw)
-                issues += 1
-
-            # --- sector -----------------------------------------------------
-            sector, sector_note = build_sector(row)
-            if sector_note:
-                log_quality_issue(conn, INSTITUTION, name, "unresolved_sector_code",
-                                  sector_note, raw)
-                issues += 1
-
-            # --- description ------------------------------------------------
-            description, description_note = build_description(row)
-            if description_note:
-                log_quality_issue(conn, INSTITUTION, name, "missing_description",
-                                  description_note, raw)
-                issues += 1
-
-            # --- date -------------------------------------------------------
-            approval_date = activity_date(row)
-            if approval_date is None:
+            approval_date, date_note = parse_date(p["date"])
+            if date_note:
                 log_quality_issue(conn, INSTITUTION, name, "unparseable_date",
-                                  "neither start-actual nor start-planned given", raw)
+                                  date_note, p)
                 issues += 1
 
-            # --- amount: per-transaction currency, NOT default-currency -----
-            amount = clean(row.get("total-Commitment"))
-            currency = clean(row.get("currency"))
-            amount_usd = None
+            if p["country"] is None:
+                log_quality_issue(conn, INSTITUTION, name, "missing_country",
+                                  "card shows no country", p)
+                issues += 1
+
+            amount, currency, amount_usd = p["amount"], p["currency"], None
             if amount is None:
                 log_quality_issue(conn, INSTITUTION, name, "missing_amount",
-                                  "total-Commitment is blank", raw)
+                                  "card shows no financing amount", p)
                 issues += 1
             else:
-                amount = float(amount)
-                if amount == 0:
-                    log_quality_issue(
-                        conn, INSTITUTION, name, "zero_amount",
-                        "source reports a commitment total of 0 — kept as disclosed, "
-                        "but almost certainly an unreported amount", raw)
+                year = int(approval_date[:4]) if approval_date else None
+                amount_usd, fx_note = to_usd(amount, currency, year)
+                if fx_note and amount_usd is None:
+                    log_quality_issue(conn, INSTITUTION, name, "fx_rate_missing",
+                                      fx_note, p)
                     issues += 1
-                if currency is None:
-                    log_quality_issue(
-                        conn, INSTITUTION, name, "missing_currency",
-                        f"amount {amount:,.0f} has no per-transaction currency; "
-                        "amount_usd left NULL (default-currency is unreliable in "
-                        "this publication and is deliberately not used)", raw)
+                elif fx_note:
+                    log_quality_issue(conn, INSTITUTION, name,
+                                      "fx_rate_approximated", fx_note, p)
                     issues += 1
-                else:
-                    year = int(approval_date[:4]) if approval_date else None
-                    amount_usd, fx_note = to_usd(amount, currency, year)
-                    if fx_note and amount_usd is None:
-                        log_quality_issue(conn, INSTITUTION, name, "fx_rate_missing",
-                                          fx_note, raw)
-                        issues += 1
-                    elif fx_note:
-                        log_quality_issue(conn, INSTITUTION, name,
-                                          "fx_rate_approximated", fx_note, raw)
-                        issues += 1
 
             conn.execute(
                 """INSERT INTO projects
@@ -228,21 +318,21 @@ def load(path: Path) -> None:
                 (
                     INSTITUTION,
                     name,
-                    country,
+                    p["country"],
                     None,   # region: canonical_region comes from country harmonization
-                    sector,
+                    p["sector"],
                     None,
-                    None,   # instrument: not in IATI's activity CSV
+                    None,   # instrument: not on the card
                     amount,
                     currency,
                     amount_usd,
                     approval_date,
                     None,
-                    ACTIVITY_STATUS.get(clean(row.get("activity-status-code"))),
-                    None,   # es_category: not in IATI's activity CSV
-                    clean(row.get("participating-org (Implementing)")),
+                    p["status"],
+                    None,   # es_category: not on the card
+                    None,   # sponsor: not on the card
                     description,
-                    dportal_url(clean(row.get("iati-identifier")), DATA_URL),
+                    p["url"],
                     scraped_at,
                 ),
             )
@@ -252,8 +342,11 @@ def load(path: Path) -> None:
     finally:
         conn.close()
 
-    print(f"Inserted {inserted} FMO activities ({issues} quality issues logged).")
+    print(f"Inserted {inserted} FMO investments ({issues} quality issues logged).")
 
 
 if __name__ == "__main__":
-    load(download())
+    print(f"Crawling {BASE_URL} by fund")
+    all_projects = fetch_all()
+    archive(all_projects)
+    load(all_projects)

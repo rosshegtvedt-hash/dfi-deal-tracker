@@ -18,7 +18,7 @@ python -m scrapers.idbinvest # 1d. refresh IDB Invest (feed always current)
 python -m scrapers.adb      # 1e. refresh ADB (needs manual download — see below)
 python -m scrapers.afdb     # 1f. refresh AfDB (needs manual download — see below)
 python -m scrapers.bii      # 1g. refresh BII (IATI feed always current)
-python -m scrapers.fmo      # 1h. refresh FMO (IATI feed always current)
+python -m scrapers.fmo      # 1h. refresh FMO (crawls fmo.nl world map, ~2 min)
 python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
 python -m scrapers.eib      # 1j. refresh EIB Global (live service)
 python harmonize.py         # 2. apply sector_mapping.csv -> canonical sectors
@@ -127,13 +127,22 @@ institution's own spelling and are not comparable across institutions.
   <https://mapafrica.afdb.org/en>, export the projects CSV, save it into
   `data\raw\` with a filename starting `afdb_mapafrica`, then run
   `python -m scrapers.afdb` (it picks the newest matching file).
-- **BII and FMO:** nothing to update — both IATI publications are refreshed
-  continuously and the loaders fetch them live each run. They share their
-  fetching/parsing plumbing via `scrapers/iati_common.py`.
-- **FMO caveat:** FMO's IATI feed covers the Dutch government funds it
-  manages, *not* FMO's own investment portfolio, and includes
-  technical-assistance contracts. See data_dictionary.md before using it in
-  cross-institution comparisons.
+- **BII:** nothing to update — its IATI publication is refreshed
+  continuously and the loader fetches it live each run.
+- **FMO:** nothing to update — crawled live from FMO's own world map. Note
+  the crawl makes ~150 page requests with a polite delay, so it takes a
+  couple of minutes.
+- **FMO caveat:** the loader records the **fund** on every row.
+  `Fund: FMO` is FMO's own account; the rest (MASSIF, Building Prospects,
+  Access to Energy Fund, …) are Dutch government funds FMO merely
+  administers. Filter to the FMO fund before comparing FMO with
+  IFC/EBRD/AfDB. See data_dictionary.md.
+- **BII caveat:** BII is loaded from IATI's **transaction** export (one row
+  per dated commitment), not the activity export. The activity export's
+  lifetime `total-Commitment` overstated BII by roughly 2x, partly because
+  BII republishes many transactions verbatim — "Africa Gateway" appeared
+  five times at USD 325m, producing a USD 1,625m phantom. Repeats are
+  collapsed on identifying fields and logged. See data_dictionary.md.
 - **Proparco:** nothing to update — AFD's open-data portal refreshes roughly
   monthly and the loader fetches it live each run.
 - **EIB Global:** nothing to update — fetched live from EIB's own service.

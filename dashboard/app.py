@@ -25,7 +25,7 @@ INSTITUTION_COLORS = {
     "IFC": "#2a78d6",         # blue
     "EBRD": "#1baf7a",        # aqua
     "DFC": "#eda100",         # yellow
-    "BII": "#008300",         # green
+    "IDB Invest": "#008300",  # green
     "EIB Global": "#4a3aa7",  # violet
     "AfDB": "#e34948",        # red
 }
@@ -37,7 +37,7 @@ INSTITUTION_COLORS = {
 # hardcoded rather than computed at runtime, so filtering never repaints a
 # survivor. Every other part of the dashboard still shows all ten separately.
 OTHER_SERIES = "Other DFIs"
-FOLDED_INTO_OTHER = {"IDB Invest", "ADB", "Proparco", "FMO"}
+FOLDED_INTO_OTHER = {"BII", "ADB", "Proparco", "FMO"}
 INSTITUTION_COLORS[OTHER_SERIES] = "#898781"  # neutral, not a categorical hue
 GRID = "#e1e0d9"
 MUTED = "#898781"
@@ -291,20 +291,11 @@ with st.expander("Data notes"):
   authorised disclosure. Proparco totals here are a floor, never a complete
   picture, and must not be compared like-for-like with IFC/EBRD/AfDB totals
   without saying so.
-- **FMO here is not FMO's own investment portfolio.** Its IATI publication
-  covers the Dutch government funds FMO manages (MASSIF, Building
-  Prospects, AEF-I and others) and includes technical-assistance and
-  consultancy contracts, so its deal counts and recipient countries (led by
-  fund domiciles such as the US, Netherlands and Luxembourg) are not
-  comparable with the other institutions'. See data_dictionary.md.
-- **Amounts** are each institution's own commitment converted to US dollars
-  (ECB annual-average rates for EUR and other covered currencies). Deals in
-  currencies without ECB reference rates show no dollar amount.
-- **Probable duplicates** are fuzzy-matched leads for co-financed deals, not
-  confirmed matches. The toggle keeps each group's largest single commitment.
-- Full field definitions and per-source caveats: `data_dictionary.md` in the
-  project folder; data-quality flags are logged in the `quality_issues` table.
-        """)
+- **FMO rows carry their fund.** `Fund: FMO` is FMO's own account;
+  the rest (MASSIF, Building Prospects, Access to Energy Fund and
+  other Dutch government funds) are money FMO administers rather than
+  lends. Filter on the fund before comparing FMO with the others.
+""")
 
 st.caption(
     "Source: public project disclosures of DFC, IFC (via WBG Finances One), "

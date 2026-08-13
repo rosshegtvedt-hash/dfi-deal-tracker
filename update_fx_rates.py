@@ -25,11 +25,12 @@ from pathlib import Path
 import requests
 
 OUT_PATH = Path(__file__).parent / "fx_rates.csv"
-# EUR/GBP for EBRD & future BII; MXN/BRL for IDB Invest local-currency deals.
-# (The ECB publishes reference rates for ~30 currencies; smaller LAC
-# currencies like COP/PEN/PYG are not covered — loaders log those as
-# fx_rate_missing rather than guessing.)
-CURRENCIES = ["EUR", "GBP", "MXN", "BRL"]
+# EUR/GBP for EBRD; MXN/BRL for IDB Invest; INR/ZAR/TRY/DKK/CHF/THB/PHP for
+# FMO's local-currency investments. (The ECB publishes reference rates for
+# ~30 currencies; KES, GEL, JOD, NGN, TZS, RWF and most LAC currencies are
+# not among them — loaders log those as fx_rate_missing rather than guessing.)
+CURRENCIES = ["EUR", "GBP", "MXN", "BRL",
+              "INR", "ZAR", "TRY", "DKK", "CHF", "THB", "PHP"]
 START_YEAR = 1999            # ECB reference rates begin here
 SOURCE_NOTE = "ECB reference rates via frankfurter.app, annual average of daily rates"
 

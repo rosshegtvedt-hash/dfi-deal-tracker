@@ -14,19 +14,55 @@ NOTE: the `stream=True` query parameter is REQUIRED. Without it the API
 silently returns only the first 50 rows — a silent truncation, so the
 loader asserts a plausible row count before touching the database.
 
+=================== WHAT ONE ROW IS, AND WHAT THE AMOUNT MEANS =============
+One row is ONE COMMITMENT TRANSACTION: a single dated commitment by BII,
+valued in USD, taken from the Datastore's `transaction` export.
+`amount_original` is that transaction's own value — not a facility size, not
+a portfolio balance, and not a lifetime total.
+
+This loader deliberately does NOT use the activity export's
+`total-Commitment`, which was the original source and overstated BII by
+roughly 2x. Two compounding reasons:
+  * it sums every commitment an activity ever received, so several separate
+    commitments made years apart collapsed into one row dated to the
+    activity's start; and
+  * BII's published transactions contain a large number of duplicates. Of
+    2,926 commitment transactions, only ~1,368 are distinct once matched on
+    the fields that identify a commitment (DEDUP_KEY below: activity, date,
+    value, currency, provider). "Africa Gateway" carried five identical USD
+    325m records — which is exactly where its USD 1,625m figure came from —
+    and the two USD 400m "Standard Chartered Risk Sharing Facility" records
+    differ only in the character encoding of an apostrophe in their
+    narrative ("CDCís" vs "CDC's"), so a whole-row comparison misses them.
+
+Matching therefore uses the identifying fields and ignores the narrative
+text. Two genuinely separate commitments of an identical amount, to the same
+activity, on the same day, from the same provider would be indistinguishable
+in this data anyway. The loader keeps the first of each set, drops the rest,
+and logs one 'duplicate_transaction_collapsed' issue per set recording how
+many copies there were. Nothing is scaled or apportioned.
+
+Negative transactions (30 of them, netting about -USD 0.9bn) are genuine
+reversals and cancellations. They are loaded as published, so totals net
+correctly, and flagged as 'negative_amount' because a negative row is
+surprising in a deal table.
+============================================================================
+
 Field mapping (source column -> our schema):
     title                             -> project_name (BII titles are the
                                          investee company / fund name)
-    description                       -> description
+    transaction_description, else
+      description                     -> description
     recipient-country, else
       recipient-region                -> country (see 'Countries' below)
     sector-code + sector-vocabulary   -> sector (see 'Sectors' below)
-    total-Commitment                  -> amount_original
+    transaction-value                 -> amount_original
     default-currency                  -> currency (read from the column;
                                          verified USD on all rows, so
                                          amount_usd = amount_original, but
                                          non-USD rows would convert via fx.py)
-    start-actual, else start-planned  -> approval_date
+    transaction-date                  -> approval_date (the commitment's own
+                                         date, not the activity's start)
     activity-status-code              -> status (IATI ActivityStatus codelist)
     iati-identifier                   -> source_url (d-portal activity page)
 
@@ -39,11 +75,6 @@ IMPORTANT — what this source does NOT contain, left NULL rather than inferred:
     investee. Putting that in `sponsor` would stamp "British International
     Investment plc" on all 1,258 rows, so sponsor stays NULL. The investee
     name is carried by project_name instead.
-
-AMOUNTS: `total-Commitment` is the activity's LIFETIME commitment total
-(the sum of all commitment transactions ever reported for it), not a single
-approval amount. It is therefore not exactly comparable to the
-single-approval amounts of the other institutions in this database.
 
 COUNTRIES: 334 of 1,258 activities have no recipient-country. Most of those
 do disclose a recipient-region (e.g. 'Africa, regional'), so the region
@@ -78,13 +109,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from database import get_connection, log_quality_issue, utc_now  # noqa: E402
 from fx import to_usd  # noqa: E402
 from scrapers.iati_common import (  # noqa: E402
-    ACTIVITY_STATUS, DATASTORE_URL, UA_HEADER, activity_date, clean,
-    download_activity_csv, dportal_url, read_activity_csv, resolve_country,
-    snapshot_row)
+    ACTIVITY_STATUS, UA_HEADER, clean, datastore_url, download_activity_csv,
+    dportal_url, read_activity_csv, resolve_country, snapshot_row)
 
 INSTITUTION = "BII"
 REPORTING_ORG = "GB-COH-03877777"
-DATA_URL = DATASTORE_URL.format(org=REPORTING_ORG)
+RESOURCE = "transaction"          # one row per commitment, not per activity
+DATA_URL = datastore_url(REPORTING_ORG, RESOURCE)
+
+# The fields that identify a commitment. Deliberately excludes the narrative:
+# BII republishes the same transaction with different text encodings, so
+# comparing whole rows leaves duplicates behind.
+DEDUP_KEY = ["iati-identifier", "transaction-date", "transaction-value",
+             "default-currency", "transaction_provider-org"]
 CODELIST_URL = "https://codelists.codeforiati.org/api/json/en/{}.json"
 RAW_DIR = Path(__file__).parent.parent / "data" / "raw"
 
@@ -142,7 +179,8 @@ GICS_NAMES = {
 
 
 def download() -> Path:
-    return download_activity_csv(REPORTING_ORG, "bii_iati_activities", RAW_DIR)
+    return download_activity_csv(REPORTING_ORG, "bii_iati_transactions",
+                                 RAW_DIR, resource=RESOURCE)
 
 
 def fetch_codelist(name: str) -> dict:
@@ -190,6 +228,16 @@ def load(path: Path) -> None:
     dac = fetch_codelist("Sector")
     dac_category = fetch_codelist("SectorCategory")
 
+    # Collapse republished copies of the same commitment (see DEDUP_KEY).
+    before = len(df)
+    signature = df[DEDUP_KEY].fillna("").astype(str).agg("".join, axis=1)
+    copies = signature.value_counts()
+    df = df[~signature.duplicated()].copy()
+    df["_copies"] = signature[df.index].map(copies)
+    collapsed = before - len(df)
+    print(f"{before} transactions -> {len(df)} after collapsing {collapsed} "
+          "republished copies")
+
     conn = get_connection()
     scraped_at = utc_now()
     inserted = issues = 0
@@ -221,28 +269,48 @@ def load(path: Path) -> None:
                                   sector_note, raw)
                 issues += 1
 
-            # --- date: actual start, else planned ---------------------------
-            approval_date = activity_date(row)
+            # --- this commitment's own date ---------------------------------
+            approval_date = clean(row.get("transaction-date"))
             if approval_date is None:
                 log_quality_issue(conn, INSTITUTION, name, "unparseable_date",
-                                  "neither start-actual nor start-planned given", raw)
+                                  "transaction-date is blank", raw)
+                issues += 1
+            else:
+                approval_date = approval_date[:10]
+
+            # --- duplicates collapsed on the way in -------------------------
+            copies = int(row.get("_copies") or 1)
+            if copies > 1:
+                log_quality_issue(
+                    conn, INSTITUTION, name, "duplicate_transaction_collapsed",
+                    f"BII published this commitment {copies} times with the same "
+                    "activity, date, value, currency and provider; "
+                    f"{copies - 1} copies dropped and one kept. Summing them would "
+                    f"have multiplied this commitment by {copies}.", raw)
                 issues += 1
 
             # --- amount -----------------------------------------------------
-            amount = clean(row.get("total-Commitment"))
+            amount = clean(row.get("transaction-value"))
             currency = clean(row.get("default-currency"))
             amount_usd = None
             if amount is None:
                 log_quality_issue(conn, INSTITUTION, name, "missing_amount",
-                                  "total-Commitment is blank", raw)
+                                  "transaction-value is blank", raw)
                 issues += 1
             else:
                 amount = float(amount)
                 if amount == 0:
                     log_quality_issue(
                         conn, INSTITUTION, name, "zero_amount",
-                        "source reports a lifetime commitment total of 0 — kept as "
-                        "disclosed, but almost certainly an unreported amount", raw)
+                        "source reports a commitment of 0 — kept as disclosed, but "
+                        "almost certainly an unreported amount", raw)
+                    issues += 1
+                elif amount < 0:
+                    log_quality_issue(
+                        conn, INSTITUTION, name, "negative_amount",
+                        f"commitment of {amount:,.0f} is negative — a reversal or "
+                        "cancellation. Loaded as published so totals net correctly.",
+                        raw)
                     issues += 1
                 if currency is None:
                     log_quality_issue(conn, INSTITUTION, name, "missing_currency",
@@ -286,7 +354,8 @@ def load(path: Path) -> None:
                     ACTIVITY_STATUS.get(clean(row.get("activity-status-code"))),
                     None,   # es_category: not in IATI's activity CSV
                     None,   # sponsor: see docstring — no investee org published
-                    clean(row.get("description")),
+                    clean(row.get("transaction_description"))
+                    or clean(row.get("description")),
                     source_url,
                     scraped_at,
                 ),

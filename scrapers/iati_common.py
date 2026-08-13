@@ -16,8 +16,15 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-DATASTORE_URL = ("https://datastore.codeforiati.org/api/1/access/activity.csv"
+DATASTORE_URL = ("https://datastore.codeforiati.org/api/1/access/{resource}.csv"
                  "?stream=True&reporting-org={org}")
+
+
+def datastore_url(reporting_org: str, resource: str = "activity") -> str:
+    """Datastore export URL. `resource` is 'activity' (one row per activity,
+    with lifetime totals) or 'transaction' (one row per transaction, each
+    with its own date and value)."""
+    return DATASTORE_URL.format(resource=resource, org=reporting_org)
 UA_HEADER = {"User-Agent": "RCFH-Advisory DFI tracker (contact: rosshegtvedt@gmail.com)"}
 
 # Without stream=True the API silently returns exactly 50 rows. Any export
@@ -38,11 +45,11 @@ ACTIVITY_STATUS = {
 
 
 def download_activity_csv(reporting_org: str, filename_stem: str,
-                          raw_dir: Path) -> Path:
-    """Fetch one publisher's activity CSV, archived date-stamped in data/raw/."""
+                          raw_dir: Path, resource: str = "activity") -> Path:
+    """Fetch one publisher's CSV export, archived date-stamped in data/raw/."""
     raw_dir.mkdir(parents=True, exist_ok=True)
     dest = raw_dir / f"{filename_stem}_{date.today().isoformat()}.csv"
-    url = DATASTORE_URL.format(org=reporting_org)
+    url = datastore_url(reporting_org, resource)
     print(f"Downloading {url}")
     resp = requests.get(url, headers=UA_HEADER, timeout=300)
     resp.raise_for_status()

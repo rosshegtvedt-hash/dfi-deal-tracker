@@ -19,9 +19,17 @@ never repaints the survivors.
 
 COMPARABILITY — institution totals are not like-for-like (different coverage
 windows; EIB Global counts loan tranches; Proparco covers only
-disclosure-consented deals since 2014; FMO publishes Dutch government funds).
-Charts therefore default to a recent window (RECENT_FROM onward) and every
-subtitle states the cut being shown.
+disclosure-consented deals since 2014). Charts therefore default to a recent
+window (RECENT_FROM onward) and every subtitle states the cut being shown.
+
+FMO is filtered to its OWN ACCOUNT everywhere in these charts. FMO's
+disclosure covers both its own book and the Dutch government funds it
+administers (MASSIF, Building Prospects, Access to Energy Fund and others),
+and the two have very different deal sizes — blending them put FMO's average
+cheque at USD 12m against USD 15m for its own lending, and inflated its deal
+count with programme grants. Every other institution here is its own account,
+so filtering FMO makes the comparison honest. The interactive dashboards
+still show all FMO rows, each tagged with its fund.
 """
 
 import sqlite3
@@ -60,17 +68,23 @@ INSTITUTION_COLORS = {
     "IFC": "#2a78d6",         # blue
     "EBRD": "#1baf7a",        # aqua
     "DFC": "#eda100",         # yellow
-    "BII": "#008300",         # green
+    "IDB Invest": "#008300",  # green
     "EIB Global": "#4a3aa7",  # violet
     "AfDB": "#e34948",        # red
 }
 OTHER_SERIES = "Other DFIs"
 OTHER_COLOR = MUTED
-CHART_SERIES = ["IFC", "EBRD", "AfDB", "EIB Global", "BII", "DFC", OTHER_SERIES]
+CHART_SERIES = ["IFC", "EBRD", "AfDB", "EIB Global", "IDB Invest", "DFC", OTHER_SERIES]
 
 FOOTER = ("Source: public project disclosures of DFC, IFC, EBRD, IDB Invest, ADB, "
-          "AfDB, BII, FMO, Proparco and EIB Global.\n"
+          "AfDB, BII, FMO, Proparco and EIB Global. FMO is its own account only.\n"
           "Compiled by RCFH Advisory · DFI Deal Flow Tracker · Data as of {as_of}")
+
+# FMO publishes its own book alongside Dutch government funds it merely
+# administers. Only the own-account rows belong in a comparison against
+# institutions that lend off their own balance sheet.
+OWN_ACCOUNT_ONLY = {"FMO"}
+OWN_ACCOUNT_FUND = "FMO"
 
 plt.rcParams["font.family"] = ["Segoe UI", "DejaVu Sans"]
 
@@ -81,7 +95,7 @@ def load():
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """SELECT institution, project_name, canonical_country AS country,
-                  canonical_sector AS sector, amount_usd,
+                  canonical_sector AS sector, amount_usd, description,
                   COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER),
                            fiscal_year) AS year,
                   probable_duplicate_group AS dup
@@ -89,12 +103,29 @@ def load():
     ).fetchall()
     as_of = (conn.execute("SELECT MAX(scraped_at) FROM projects").fetchone()[0] or "")[:10]
     conn.close()
-    return [dict(r) for r in rows], as_of
+    return [own_account(dict(r)) for r in rows], as_of
+
+
+def funds_of(row):
+    """Fund names a row is tagged with, from 'Fund: X' / 'Funds: X; Y'."""
+    text = row.get("description") or ""
+    if not text.startswith(("Fund:", "Funds:")):
+        return []
+    return [f.strip() for f in text.split(":", 1)[1].split(";") if f.strip()]
+
+
+def own_account(row):
+    """Mark whether a row is the institution's own lending."""
+    row["is_own_account"] = (
+        row["institution"] not in OWN_ACCOUNT_ONLY
+        or OWN_ACCOUNT_FUND in funds_of(row))
+    return row
 
 
 def recent(rows, lo=RECENT_FROM, hi=RECENT_TO):
     return [r for r in rows
-            if r["year"] and lo <= r["year"] <= hi and r["amount_usd"] is not None]
+            if r["is_own_account"]
+            and r["year"] and lo <= r["year"] <= hi and r["amount_usd"] is not None]
 
 
 def series_for(institution):
@@ -253,10 +284,10 @@ def chart_over_time(rows, as_of):
         "Development finance commitments, 2015–2024",
         "Ten institutions' disclosed commitments, in US$ billions per year.",
         as_of,
-        note=("Coverage differs by institution — EIB Global counts loan tranches, "
-              "Proparco only disclosure-consented deals, FMO Dutch government funds.\n"
-              "Totals are a floor. 2025 is omitted: several sources had not reported "
-              "it in full, which would read as a fall that did not happen."))
+        note=("Coverage differs by institution — EIB Global counts loan tranches and "
+              "Proparco only disclosure-consented deals. Totals are a floor.\n"
+              "2025 is omitted: several sources had not reported it in full, which "
+              "would read as a fall that did not happen."))
     bottom = {y: 0.0 for y in years}
     gap = 0.06  # surface gap between stacked segments, in data units
     for s in CHART_SERIES:
@@ -345,7 +376,7 @@ def chart_cofinancing(rows, as_of):
     """Institution pairs that show up in the same probable co-financing group."""
     groups = {}
     for r in rows:
-        if r["dup"]:
+        if r["dup"] and r["is_own_account"]:
             groups.setdefault(r["dup"], set()).add(r["institution"])
     pairs = {}
     for members in groups.values():

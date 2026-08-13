@@ -184,13 +184,32 @@ logged, never silently dropped or filled in.
   The `stream=True` parameter is **required**: without it the API silently
   returns only the first 50 rows, so the loader refuses to load any export
   with implausibly few rows rather than overwriting good data.
-- **Amounts are lifetime commitment totals** (`total-Commitment` — the sum
-  of every commitment transaction ever reported for an activity), not
-  single approval amounts. BII figures are therefore not exactly comparable
-  like-for-like with the other institutions' per-approval amounts.
-  All rows are USD (currency read from `default-currency`, not assumed).
-- `approval_date` holds the activity's **start date** (`start-actual`,
-  falling back to `start-planned`) — IATI publishes no board-approval date.
+- **One row is one commitment transaction**, read from the Datastore's
+  `transaction` export: a single dated commitment by BII, valued in USD.
+  `amount_original` is that transaction's own value — not a facility size,
+  not a portfolio balance, not a lifetime total.
+- **This replaced an earlier activity-level load that overstated BII by
+  roughly 2x** (all-time USD 77.4bn against USD 35.0bn now; 2016 onward
+  USD 57.3bn against USD 25.8bn). Two causes compounded. The activity
+  export's `total-Commitment` sums every commitment an activity ever
+  received, collapsing separate commitments made years apart into one row
+  dated to the activity's start. And BII's published transactions are
+  heavily duplicated: only ~1,368 of 2,926 are distinct once matched on the
+  fields that identify a commitment. "Africa Gateway" carried **five
+  identical USD 325m records**, which is exactly where its USD 1,625m
+  figure came from.
+- **De-duplication matches on identifying fields, not narrative text**
+  (`DEDUP_KEY`: activity, date, value, currency, provider). Whole-row
+  comparison is not enough — the two USD 400m "Standard Chartered Risk
+  Sharing Facility" records differ only in the character encoding of an
+  apostrophe. Each collapsed set is logged as
+  `duplicate_transaction_collapsed` with the number of copies. Nothing is
+  scaled or apportioned.
+- 30 transactions are **negative** (about -USD 0.9bn in total): genuine
+  reversals and cancellations, loaded as published so totals net correctly,
+  and flagged `negative_amount`.
+- `approval_date` is the **commitment's own transaction date**, so BII's
+  commitments now fall in the years they were actually made.
 - Not in IATI's activity CSV, left NULL rather than inferred: `es_category`,
   `instrument`, and `sponsor` — for sponsor, the Implementing-org field is
   empty on every row and the Funding org is BII/CDC itself, so filling it
@@ -220,44 +239,45 @@ logged, never silently dropped or filled in.
 
 ### FMO (`scrapers/fmo.py`)
 
-- Source: FMO's IATI publication (reporting org `NL-KVK-27078545`) via the
-  Code for IATI Datastore Classic — same mechanism, guard and shared
-  plumbing as BII (`scrapers/iati_common.py`). Nothing to update by hand.
-- **⚠ This is not FMO's own investment portfolio.** Every activity names
-  the *Ministry of Foreign Affairs of the Netherlands* as funder, and the
-  titles group into the Dutch government funds FMO manages: MASSIF (826),
-  Building Prospects (295), AEF-I (139), Mobilizing Finance for Forests
-  (20), LUF (13), DFCD (1). FMO's own ~EUR 12bn balance-sheet book is
-  published separately on fmo.nl and is **not** in this feed. Many rows are
-  technical-assistance/consultancy contracts (implementing orgs include
-  Accion, MicroFinanza Rating, Value for Women, Niras, Frankfurt School),
-  and the leading recipient countries are fund domiciles — United States
-  (142), Netherlands (141), Mauritius (85), UK (55), Luxembourg (38).
-  Read this institution as "Dutch government funds managed by FMO"; its
-  deal counts and geography are not like-for-like with the others.
-- **Currency — `default-currency` is wrong here and is deliberately not
-  used.** It reads EUR on all 1,294 rows, but the per-transaction
-  `currency` column reports 39 different currencies (EUR 653, USD 507, then
-  INR, KES, XOF, BDT, VND, KHR, UZS, TZS, UGX, …). Taking the EUR label at
-  face value would read 38.2bn Vietnamese dong as EUR 38.2bn: the raw
-  amount column sums to EUR 155.94bn against an actual programme size of
-  about USD 3.9bn. The loader reads the per-transaction `currency` and
-  converts with `fx.py`. The Datastore's `total-Commitment-USD` column is
-  not a usable alternative — it is a pass-through equal to the raw amount
-  for USD rows and 0 for every non-USD row.
-  129 rows are in currencies `fx_rates.csv` has no rate for; they keep
-  `amount_original` and get `amount_usd = NULL` plus `fx_rate_missing`.
-- **Titles:** 1,290 of 1,294 are internal fund identifiers
-  ("MASSIF-P00015696-001") rather than project names. Loaded verbatim and
-  flagged `title_is_internal_identifier`; nothing is prettified. The only
-  four real names are the fund-level parent activities.
-- **Descriptions:** the export's `description` column is the literal string
-  `"1"` on every row (a broken field) and is ignored. Text comes from
-  `description_general`; its 438 "Description not provided" placeholders are
-  stored as NULL and logged rather than saved as content.
-- `sponsor` = `participating-org (Implementing)`, populated on all rows —
-  for TA contracts this is the adviser, for investments the counterparty.
-- Not published, left NULL: `es_category`, `instrument`.
+- Source: FMO's own project disclosure, the world map at
+  <https://www.fmo.nl/world-map> — server-rendered, no API key, paginated
+  20 per page. Fetched live each run; nothing to update by hand.
+- **This replaced an earlier IATI load that had the wrong population.**
+  FMO's IATI publication (`NL-KVK-27078545`) contains **none of FMO's
+  own-account investments**: every activity belongs to a fund FMO manages
+  for the Dutch state, reported at transaction grain down to
+  technical-assistance line items of a few thousand dollars. Under that
+  source "FMO" meant MASSIF, Building Prospects and AEF-I only, with a
+  median deal of about USD 0.3m and USD 1.9bn over a decade — against a
+  committed portfolio of roughly EUR 13bn.
+- **Every row records its fund**, in `description`, as `Fund: FMO`,
+  `Funds: FMO; MASSIF`, and so on — the same treatment `scrapers/afdb.py`
+  gives AfDB's sovereign/window flags. **`Fund: FMO` is FMO's own account**
+  (911 investments); the rest are Dutch government programme funds
+  (MASSIF 263, Building Prospects 136, Access to Energy Fund 69, Ventures
+  Program 29, DFCD 20, Mobilising Finance for Forests 12, Other funding 5).
+  To compare FMO against IFC/EBRD/AfDB, filter to the FMO fund; the
+  programme rows are kept because they are real disclosures, but they are
+  money FMO administers rather than lends.
+  **FMO own account, 2016 onward: USD 15.8bn across 825 investments,
+  median USD 15.0m.**
+- 68 investments appear in the full list under no fund filter; they load as
+  `Fund: not stated` and are logged `fund_not_stated` rather than guessed
+  into a fund.
+- **Pagination is not stable.** One pass over the unfiltered list returns
+  1,308 cards but only ~1,288 distinct projects — some appear on two pages,
+  others are missed. The loader therefore crawls every fund view *and* the
+  unfiltered list and unions them on FMO's project id, recovering ~1,510
+  distinct investments.
+- Amounts are **FMO's own financing per project** ("Total FMO financing" on
+  the card) in the deal's currency — mostly USD and EUR, but also INR, ZAR,
+  KES, GEL and others. Currencies `fx_rates.csv` covers are converted;
+  the rest keep `amount_original` with `amount_usd = NULL` and a logged
+  `fx_rate_missing`.
+- `approval_date` is the **disclosure date** shown on the card, i.e. FMO's
+  publication date for the investment rather than a board-approval date.
+- Not published on the card, left NULL: `instrument`, `sponsor`,
+  `es_category`.
 
 ### Proparco (`scrapers/proparco.py`)
 
