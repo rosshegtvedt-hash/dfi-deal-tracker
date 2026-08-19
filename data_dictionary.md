@@ -15,7 +15,8 @@ One row per project/transaction disclosed by a development finance institution.
 | `region` | TEXT | Region as reported by the source. Each DFI uses its own region taxonomy — do not compare regions across institutions without mapping. |
 | `sector` | TEXT | Broad sector as reported by the source (each DFI has its own taxonomy). |
 | `subsector` | TEXT | Finer sector detail where the source provides it; otherwise NULL. |
-| `instrument` | TEXT | Financial product: loan, equity, guarantee, insurance, investment fund, etc. Source's own terminology. |
+| `instrument` | TEXT | Financial product: loan, equity, guarantee, insurance, investment fund, etc. Source's own terminology. **Means "what the source we loaded published"** — stays NULL where that source publishes none, even if the institution states it elsewhere. |
+| `instrument_enriched` | TEXT | Instrument recovered from a *different publication by the same institution*, used only where the loaded source publishes none. Today AfDB only, from its IATI finance type (e.g. `421 Standard loan`), set by `enrich_afdb_instruments.py`. Never overwrites `instrument`. |
 | `amount_original` | REAL | Committed amount in the source's reporting currency, in **plain units** (dollars, not millions). |
 | `currency` | TEXT | ISO 4217 code of `amount_original` (e.g. `USD`, `EUR`). |
 | `amount_usd` | REAL | Committed amount converted to **plain US dollars**. For USD sources this equals `amount_original`. |
@@ -23,7 +24,10 @@ One row per project/transaction disclosed by a development finance institution.
 | `fiscal_year` | INTEGER | The institution's fiscal year of commitment, for sources (like DFC) that disclose only a year and no exact date. Note fiscal years differ by institution (DFC: Oct 1–Sep 30). |
 | `status` | TEXT | Project status as reported (e.g. Active). NULL if the source doesn't report one. |
 | `es_category` | TEXT | Environmental & social risk category (e.g. A/B/C) where disclosed. |
-| `sponsor` | TEXT | Project sponsor / borrower / investee where disclosed. |
+| `sponsor` | TEXT | Project sponsor / borrower / investee where disclosed. Raw source value; only IFC, Proparco, ADB and IDB Invest publish one. |
+| `counterparty` | TEXT | Who the deal was WITH. Either the disclosed sponsor verbatim, or a client name cleaned out of `project_name`. Set by `derive_counterparties.py`. NULL where no client could be identified without guessing. |
+| `counterparty_key` | TEXT | `counterparty` uppercased, legal form removed, punctuation collapsed. The join key for "who appears in two institutions' books". An exact-match normalisation, NOT a fuzzy score. |
+| `counterparty_provenance` | TEXT | `disclosed` (the source named the client) or `derived_from_project_name` (we cleaned it out of the project title). Always check this before quoting a client relationship. |
 | `description` | TEXT | Free-text project description from the source. |
 | `source_url` | TEXT | URL of the disclosure page or file this record was loaded from. |
 | `scraped_at` | TEXT | UTC timestamp (ISO) of the load run that produced this row. |
@@ -418,6 +422,7 @@ every combined instrument.
 |---|---|---|
 | `project_id` | INTEGER | FK to `projects.id`, `ON DELETE CASCADE`, so a loader wiping its institution's rows clears these too. |
 | `canonical_instrument` | TEXT | One of the five canonical values below. |
+| `provenance` | TEXT | Where this value came from: `source_label` (the institution's own instrument field), `iati_enrichment` (recovered from another of its publications), or `override` (a hand-reviewed per-deal decision). Filter on it when a chart needs only what institutions published directly. |
 
 Unique on (`project_id`, `canonical_instrument`). To count deals by
 instrument, join — do not assume one row per project:
@@ -473,6 +478,58 @@ two. Capitalisation is forgiven ("Senior Debt" becomes "Senior debt") since
 these files are edited by hand in Excel and case drift is not a decision.
 Adding a value there is a **two-project decision** — the same vocabulary
 drives `../DFI Mandate Match/mandate_rules.csv`.
+
+## Instrument enrichment (`enrich_afdb_instruments.py`)
+
+AfDB's MapAfrica export publishes no instrument, so all 5,949 AfDB rows had
+none. AfDB *does* state a finance type in its own IATI publication
+(`XM-DAC-46002`) for the same projects. This step recovers it, taking AfDB
+from **0% to 78%** instrument coverage — 2,883 standard loans and 1,791
+standard grants.
+
+**The join is on an identifier, never a title.** AfDB's project code appears
+on both sides:
+
+```
+ours    https://mapafrica.afdb.org/en/projects/46002-P-MG-FA0-023
+theirs  46002-P-MG-FA0-023        (the iati-identifier)
+```
+
+5,502 of our projects match exactly. Title matching was used only as a
+feasibility diagnostic and plays no part in the load — this project has
+already been bitten by name-similarity bugs.
+
+Three rules keep the distinction honest:
+
+- The value lands in `projects.instrument_enriched`. **`projects.instrument`
+  keeps its meaning** — what the source we loaded published — and stays NULL.
+- **Enrichment fills silence, it never argues with a disclosure.**
+  `harmonize.py` reads `instrument_enriched` only for projects whose loaded
+  source published no instrument. A test asserts this directly.
+- Canonical values carry `provenance='iati_enrichment'`, so any analysis can
+  exclude them.
+
+A project with no matching IATI activity, or whose activity states no finance
+type, keeps a NULL instrument and is logged as `afdb_no_iati_match` (1,256
+projects). Nothing is inferred from similar projects. Codes are mapped through
+`instrument_mapping.csv` like any other label, so IATI code **912 "Purchase of
+securities from issuing agencies"** is deliberately blank — "securities" does
+not say debt or equity, the same reading as Proparco's "Autres titres".
+
+### The two institutions this was tried on and rejected
+
+Both checked 2026-08-19, both recorded in `harmonize.py` so the question is
+not reopened from scratch:
+
+| | Why not |
+|---|---|
+| **ADB** | Its feed is current and *does* contain our 342 nonsovereign projects — but nothing in it reliably separates them from ADB's sovereign lending. Flow-type 21 covers 95% of our rows and also 45% of the rest; finance-type 421 covers 96% and also 70%. A filter would sweep in ~1,400 activities to catch ~325 real ones. |
+| **EIB Global** | States a finance type on all 1,395 activities, but only ~21% of our 3,241 loan-part names appear (different grain — activities, not loan parts), and the feed stops in 2025 while our existing source runs to 2026. |
+
+Separately and importantly: **ADB has not republished its Nonsovereign
+Products dataset since the January 2025 edition.** Its latest deal is dated
+2024-12-03 and it contributes nothing to 2025 or 2026. That is a gap at the
+source, not a stale download.
 
 ## Per-deal instrument overrides (`instrument_overrides.csv`)
 
@@ -590,3 +647,78 @@ fiscal years differ) across institutions and writes a shared group ID to
 `probable_duplicate_group`. Flags are leads for review, not verdicts:
 generic deal names can false-positive, and co-financings disclosed under
 entirely different names will be missed.
+
+## Counterparties (`derive_counterparties.py` + `counterparty_rules.csv`)
+
+The database could always answer "which DFIs are active in Kenya". It could
+not answer "who have they backed, and who keeps going back to the same
+client" — the business-development question — because only IFC, Proparco, ADB
+and IDB Invest publish a client field. About 70% of rows had no named
+counterparty.
+
+**Every other source was checked for a client field before this was built,
+and none has one.** That matters, because the AfDB instrument gap turned out
+to be recoverable from a second publication and this one is not:
+
+| Source | What it publishes |
+|---|---|
+| EBRD | ten columns; the only name is "Operation Name" |
+| BII | IATI names a participating org, but it is *CDC Group Plc* — BII itself, as funder. No implementing or extending org. |
+| FMO | world-map records carry `title`, nothing client-like |
+| DFC | "Project Name", no borrower column |
+
+So counterparties are **derived**, and every row records which kind it is in
+`counterparty_provenance`. Coverage: **30% → 66%** (23,085 of 34,637).
+
+### Whose project name is a client name
+
+Decided by reading samples from each source directly (2026-08-19), recorded in
+`NAME_IS_COUNTERPARTY`:
+
+| Yes | No |
+|---|---|
+| FMO — "Banco Macro Sociedad Anonima" | AfDB — "Ethiopia - Agri-MSMES Development for Jobs (AMD4J) Project" |
+| BII — "Aavas Financiers Limited" | EIB Global — "ISTANBUL-ANKARA RAILWAY" |
+| DFC — "AgDevCo Limited" | |
+| EBRD — "Operation Name", usually behind a programme code | |
+
+AfDB and EIB Global therefore get **no counterparty at all**. Deriving one
+from those name fields would manufacture roughly 10,000 companies that do not
+exist. Logged as `counterparty_name_not_a_client`.
+
+### The rules file
+
+`counterparty_rules.csv` holds four active rule types and one inert one:
+
+- `prefix` — programme codes stripped from the start. "AASF - NOA Agribusiness
+  Credit Line" is NOA Agribusiness banking with the Albania Agribusiness
+  Support Facility. Matched whether separated by a dash or a space.
+- `suffix` — trailing product words ("Credit Line", "Risk Sharing Facility",
+  "MRPA"). 4,050 EBRD names are cleaned by these.
+- `legal_suffix` — corporate forms. Removed from `counterparty_key` only, and
+  kept in the displayed `counterparty`.
+- `exclude` — labels that identify nobody.
+- **`not_a_prefix`** — read and ignored on purpose. These are leading acronyms
+  that look like programme codes but are real clients: **OTP Bank, TBC Bank,
+  NLB, Development Bank of Ghana**. An automatic "strip any leading acronym"
+  rule would delete them, so the list exists to stop anyone re-deriving that
+  rule from the data. This is the single most important safeguard in the file.
+
+Two further guards: a name that is only a country is not a company (checked
+against `country_mapping.csv` rather than a second list), and an institution
+naming *itself* is not a client relationship — IFC's sponsor field says
+"INTERNATIONAL FINANCE CORPORATION" on 20 of its own rows. One DFI naming
+*another* is kept, because that is a real disclosure about a co-investor.
+
+### Matching, and why it is a floor
+
+`counterparty_key` is a normalisation, not a similarity score. **There is no
+fuzzy matching here on purpose**: an invented relationship is far more
+damaging than a missed one, and the value of a cross-institution match is that
+two independent sources agreed. Where spellings still differ after
+normalisation the link is simply missed. Fund vintages stay separate — "Growth
+Fund II" and "Growth Fund III" are different funds and must not merge.
+
+Every count in `report_counterparties.py` is therefore a **floor**: 824
+clients banked by two or more DFIs, 183 by three or more, 955 clients with
+three or more deals from one institution.

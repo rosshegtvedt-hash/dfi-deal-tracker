@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS projects (
     sector          TEXT,
     subsector       TEXT,
     instrument      TEXT,               -- loan, equity, guarantee, insurance, ...
+    instrument_enriched TEXT,           -- instrument from a DIFFERENT publication by the
+                                        -- same institution, used only where the source we
+                                        -- load publishes none (AfDB: its IATI finance-type).
+                                        -- Never overwrites `instrument`; see harmonize.py.
     amount_original REAL,               -- amount in the source's own currency
     currency        TEXT,               -- ISO code of amount_original, e.g. 'USD'
     amount_usd      REAL,               -- amount in plain US dollars (not millions)
@@ -36,6 +40,9 @@ CREATE TABLE IF NOT EXISTS projects (
     status          TEXT,
     es_category     TEXT,               -- environmental & social risk category
     sponsor         TEXT,
+    counterparty    TEXT,               -- the client/investee/borrower, for BD analysis
+    counterparty_key TEXT,              -- normalised form of counterparty, for matching across institutions
+    counterparty_provenance TEXT,       -- 'disclosed' (the source named it) or 'derived_from_project_name'
     description     TEXT,
     source_url      TEXT NOT NULL,      -- where this record came from
     scraped_at      TEXT NOT NULL,      -- ISO timestamp of the load run
@@ -68,6 +75,12 @@ CREATE TABLE IF NOT EXISTS quality_issues (
 CREATE TABLE IF NOT EXISTS project_instruments (
     project_id           INTEGER NOT NULL,
     canonical_instrument TEXT    NOT NULL,
+    -- Where this canonical value came from, so a chart can always tell an
+    -- institution's own instrument field from one recovered elsewhere:
+    --   'source_label'    -- projects.instrument, the field the loaded source published
+    --   'iati_enrichment' -- projects.instrument_enriched, the same institution's IATI feed
+    --   'override'        -- instrument_overrides.csv, a hand-reviewed per-deal decision
+    provenance           TEXT    NOT NULL DEFAULT 'source_label',
     UNIQUE (project_id, canonical_instrument),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
@@ -81,16 +94,24 @@ CREATE INDEX IF NOT EXISTS idx_projects_sector      ON projects (sector);
 """
 
 
-# Columns added after the first release. get_connection() adds any that are
-# missing, so an existing database upgrades in place without losing data.
+# Columns added after the first release, as (table, column, type).
+# get_connection() adds any that are missing, so an existing database upgrades
+# in place without losing data.
 MIGRATIONS = [
-    ("fiscal_year", "INTEGER"),
-    ("canonical_sector", "TEXT"),
-    ("canonical_subsector", "TEXT"),
-    ("probable_duplicate_group", "TEXT"),
-    ("canonical_es_category", "TEXT"),
-    ("canonical_country", "TEXT"),
-    ("canonical_region", "TEXT"),
+    ("projects", "fiscal_year", "INTEGER"),
+    ("projects", "canonical_sector", "TEXT"),
+    ("projects", "canonical_subsector", "TEXT"),
+    ("projects", "probable_duplicate_group", "TEXT"),
+    ("projects", "canonical_es_category", "TEXT"),
+    ("projects", "canonical_country", "TEXT"),
+    ("projects", "canonical_region", "TEXT"),
+    ("projects", "instrument_enriched", "TEXT"),
+    # harmonize.py rebuilds project_instruments in full on every run, so
+    # existing rows taking the default here are corrected on the next run.
+    ("project_instruments", "provenance", "TEXT NOT NULL DEFAULT 'source_label'"),
+    ("projects", "counterparty", "TEXT"),
+    ("projects", "counterparty_key", "TEXT"),
+    ("projects", "counterparty_provenance", "TEXT"),
 ]
 
 
@@ -104,10 +125,15 @@ def get_connection() -> sqlite3.Connection:
     # project_instruments rows (ON DELETE CASCADE) instead of orphaning them.
     conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
-    existing = {row[1] for row in conn.execute("PRAGMA table_info(projects)")}
-    for column, sql_type in MIGRATIONS:
+    for table, column, sql_type in MIGRATIONS:
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
         if column not in existing:
-            conn.execute(f"ALTER TABLE projects ADD COLUMN {column} {sql_type}")
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}")
+    # Indexes on migrated columns must come AFTER the migrations: on an
+    # existing database CREATE TABLE is a no-op, so a column added by
+    # MIGRATIONS does not exist yet while SCHEMA is running.
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_cpty_key "
+                 "ON projects (counterparty_key)")
     return conn
 
 

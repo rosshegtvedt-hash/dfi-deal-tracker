@@ -267,8 +267,8 @@ def apply_instrument_overrides(conn):
             for value in values:
                 conn.execute(
                     "INSERT OR IGNORE INTO project_instruments "
-                    "(project_id, canonical_instrument) VALUES (?, ?)",
-                    (row["id"], value))
+                    "(project_id, canonical_instrument, provenance) VALUES (?, ?, ?)",
+                    (row["id"], value, "override"))
             changed += 1
     return changed, replaced, stale
 
@@ -334,9 +334,10 @@ NO_INSTRUMENT_SOURCES = {
     "AfDB": (
         "No instrument recorded. The MapAfrica bulk export this loader reads has "
         "no instrument-like column at all (its 29 columns cover sector, status, "
-        "dates, amounts, safeguards and funding window). Absent from the source "
-        "we read; whether AfDB publishes instrument elsewhere has not been "
-        "established."),
+        "dates, amounts, safeguards and funding window). AfDB DOES publish a "
+        "finance type in its own IATI feed (XM-DAC-46002), and "
+        "enrich_afdb_instruments.py recovers it by joining on the AfDB project "
+        "code — so if this issue is showing, that step has not been run."),
     "BII": (
         "No instrument recorded. IATI carries instrument in the finance-type "
         "fields, and BII leaves them empty: default-finance-type-code and "
@@ -349,7 +350,12 @@ NO_INSTRUMENT_SOURCES = {
         "region and sector tags per loan part, and the public project page "
         "(eib.org/en/projects/loans/all/<id>) gives total cost and signature "
         "amounts but names no finance type. Absent from both the service and the "
-        "project page."),
+        "project page. EIB's IATI feed (XM-DAC-918-3) was checked on 2026-08-19 "
+        "and REJECTED as a source for this: it states a finance type on all "
+        "1,395 of its activities, but only ~21% of our 3,241 loan-part names "
+        "appear in it (different grain — activities, not loan parts) and it "
+        "stops in 2025 while our existing source runs to 2026. Enriching from it "
+        "would join a fifth of our rows against a feed 18 months behind."),
     "FMO": (
         "No instrument recorded. Checked directly: neither the world-map card nor "
         "the project-detail page names an instrument. The detail page's "
@@ -417,9 +423,12 @@ def flag_institutions_without_instruments(conn):
                  "WHERE issue_type = 'instrument_absent_from_source'")
     flagged = []
     for institution, finding in sorted(NO_INSTRUMENT_SOURCES.items()):
+        # Enrichment counts as coverage: once AfDB's IATI finance types are in,
+        # "AfDB publishes no instrument" is no longer the useful thing to say.
         has_any = conn.execute(
-            "SELECT COUNT(*) FROM projects WHERE institution = ? "
-            "AND instrument IS NOT NULL AND TRIM(instrument) <> ''",
+            "SELECT COUNT(*) FROM projects WHERE institution = ? AND ("
+            "(instrument IS NOT NULL AND TRIM(instrument) <> '') OR "
+            "(instrument_enriched IS NOT NULL AND TRIM(instrument_enriched) <> ''))",
             (institution,)).fetchone()[0]
         if has_any:
             continue        # a loader now captures it; the finding is stale
@@ -430,10 +439,21 @@ def flag_institutions_without_instruments(conn):
 
 
 def harmonize_instruments(conn):
-    """Rebuild project_instruments from the CSV.
+    """Rebuild project_instruments from the CSV, in two passes.
 
-    Returns (rows_written, unmapped) where unmapped maps
-    (institution, raw label) -> number of projects carrying it.
+    Pass 1 reads `projects.instrument` — the field the loaded source published.
+    Pass 2 reads `projects.instrument_enriched` — the same institution's
+    instrument recovered from a different publication of its own (today only
+    AfDB, from its IATI feed; see enrich_afdb_instruments.py) — but ONLY for
+    projects whose loaded source published nothing. Enrichment fills silence;
+    it never argues with a disclosure.
+
+    Both passes share one mapping CSV and one unmapped report, so a finance
+    type nobody has classified yet surfaces exactly like an unknown label.
+    Rows are tagged with where they came from, so a chart can always separate
+    an institution's own instrument field from one recovered elsewhere.
+
+    Returns (rows_written, unmapped, enriched_rows).
     """
     mapping = read_instrument_mapping()
 
@@ -442,18 +462,27 @@ def harmonize_instruments(conn):
     conn.execute("DELETE FROM quality_issues WHERE issue_type = 'unmapped_instrument'")
 
     unmapped: dict = {}
-    for row in conn.execute(
-            "SELECT id, institution, instrument FROM projects "
-            "WHERE instrument IS NOT NULL AND TRIM(instrument) <> ''").fetchall():
-        key = (row["institution"], (row["instrument"] or "").strip())
-        if key not in mapping:
-            unmapped[key] = unmapped.get(key, 0) + 1
-            continue
-        for canonical in mapping[key]:      # empty list -> nothing written
-            conn.execute(
-                "INSERT OR IGNORE INTO project_instruments "
-                "(project_id, canonical_instrument) VALUES (?, ?)",
-                (row["id"], canonical))
+
+    def apply(sql, provenance):
+        for row in conn.execute(sql).fetchall():
+            key = (row["institution"], (row["value"] or "").strip())
+            if key not in mapping:
+                unmapped[key] = unmapped.get(key, 0) + 1
+                continue
+            for canonical in mapping[key]:      # empty list -> nothing written
+                conn.execute(
+                    "INSERT OR IGNORE INTO project_instruments "
+                    "(project_id, canonical_instrument, provenance) VALUES (?, ?, ?)",
+                    (row["id"], canonical, provenance))
+
+    apply("SELECT id, institution, instrument AS value FROM projects "
+          "WHERE instrument IS NOT NULL AND TRIM(instrument) <> ''",
+          "source_label")
+    apply("SELECT id, institution, instrument_enriched AS value FROM projects "
+          "WHERE (instrument IS NULL OR TRIM(instrument) = '') "
+          "AND instrument_enriched IS NOT NULL "
+          "AND TRIM(instrument_enriched) <> ''",
+          "iati_enrichment")
 
     for (institution, raw), n in sorted(unmapped.items()):
         log_quality_issue(
@@ -462,7 +491,10 @@ def harmonize_instruments(conn):
             "instrument_mapping.csv")
 
     written = conn.execute("SELECT COUNT(*) FROM project_instruments").fetchone()[0]
-    return written, unmapped
+    enriched = conn.execute(
+        "SELECT COUNT(*) FROM project_instruments "
+        "WHERE provenance = 'iati_enrichment'").fetchone()[0]
+    return written, unmapped, enriched
 
 
 def main():
@@ -501,7 +533,7 @@ def main():
         )
 
     countries_mapped, countries_unmapped = harmonize_countries(conn)
-    instrument_rows, instruments_unmapped = harmonize_instruments(conn)
+    instrument_rows, instruments_unmapped, enriched_rows = harmonize_instruments(conn)
     overridden, replaced, stale_overrides = apply_instrument_overrides(conn)
     instrument_rows = conn.execute(
         "SELECT COUNT(*) FROM project_instruments").fetchone()[0]
@@ -537,6 +569,9 @@ def main():
     else:
         print("             all instrument labels mapped.")
 
+    if enriched_rows:
+        print(f"             {enriched_rows} of those recovered from an "
+              "institution's own IATI feed (provenance='iati_enrichment').")
     print(f"             {overridden} deal(s) set from instrument_overrides.csv.")
     if replaced:
         print("             OVERRODE a label-mapped value (logged as "

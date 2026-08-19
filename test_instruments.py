@@ -100,7 +100,7 @@ def main():
     harmonize.INSTRUMENT_CSV = tmp          # point the module at the fake CSV
 
     conn = build_db()
-    written, unmapped = harmonize.harmonize_instruments(conn)
+    written, unmapped, _enriched = harmonize.harmonize_instruments(conn)
 
     print("\n1. a combined instrument produces one row per canonical value")
     check("'Debt + Equity' yields both senior debt and equity",

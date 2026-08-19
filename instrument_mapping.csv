@@ -56,3 +56,6 @@ ADB,Guarantee,Guarantee,
 ADB,Grant,Technical assistance / grant,
 ADB,TA,Technical assistance / grant,"ADB's abbreviation for technical assistance; the one record's own description calls it 'The technical assistance (TA)'."
 ADB,EI,Equity,"ADB's abbreviation for equity investment; the one record's own description says ADB 'will make an equity investment of up to $50 million'."
+AfDB,421 Standard loan,Senior debt,"IATI finance type 421, from AfDB's own IATI feed rather than MapAfrica (which publishes no instrument) - see enrich_afdb_instruments.py. Like IFC's 'Loan' and EBRD's 'Debt' it does not state seniority; senior is the default reading."
+AfDB,110 Standard grant,Technical assistance / grant,"IATI finance type 110, from AfDB's own IATI feed. AfDB's concessional windows make far more grants than the private-sector DFIs, which is why this value is large here and rare elsewhere."
+AfDB,912 Purchase of securities from issuing agencies,,"IATI finance type 912. 'Securities' does not say debt or equity, so this is too vague to place - the same reading as Proparco's 'Autres titres'. Eight records; deliberately unmapped rather than forced."

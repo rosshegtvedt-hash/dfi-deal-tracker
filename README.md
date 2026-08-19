@@ -22,6 +22,8 @@ python -m scrapers.bii      # 1g. refresh BII (IATI feed always current)
 python -m scrapers.fmo      # 1h. refresh FMO (world map + detail pages, ~25 min)
 python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
 python -m scrapers.eib      # 1j. refresh EIB Global (live service)
+python enrich_afdb_instruments.py  # 1k. recover AfDB's instrument from its own IATI feed
+python derive_counterparties.py    # 1l. work out who each deal was WITH
 python harmonize.py         # 2. apply the four mapping CSVs (sector, country, instrument, E&S) + per-deal instrument overrides
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
@@ -90,6 +92,55 @@ Two things baked in deliberately:
   largest institutions get a fixed hue; the rest share a neutral "Other".
   The dashboards use the same assignment, so exports and site agree.
 
+## Who each deal was with (counterparties)
+
+```
+python derive_counterparties.py     # fill in the client on every deal it can
+python report_counterparties.py     # who shares clients with whom
+```
+
+"Which DFIs are active in Kenya" was always answerable. "Who have they backed,
+which of them keep going back to the same client, and who has raised money
+from several" was not — only IFC, Proparco, ADB and IDB Invest publish a
+client field, leaving ~70% of the database with no named counterparty.
+
+Every other source was checked for a client field first, and **none has one**
+— unlike AfDB's instrument, which really was published elsewhere. So this is
+**derived**, and every row says so in `counterparty_provenance`:
+
+- `disclosed` — the source published a sponsor; used verbatim.
+- `derived_from_project_name` — cleaned from the project name, using the rules
+  in `counterparty_rules.csv`.
+
+Coverage went from **30% to 66%** (23,085 of 34,637 deals).
+
+Two things this deliberately will not do:
+
+- **AfDB and EIB Global get no counterparty at all.** Their name fields hold
+  project and asset names — "Ethiopia - Agri-MSMES Development for Jobs
+  Project", "ISTANBUL-ANKARA RAILWAY" — so deriving clients from them would
+  invent about 10,000 companies that don't exist.
+- **No fuzzy matching.** `counterparty_key` is a normalisation, not a
+  similarity score. Two spellings that still differ after normalising stay
+  apart, so a real relationship is missed rather than a false one invented.
+  Every count in the report is therefore a floor.
+
+`counterparty_rules.csv` is the editable part. `prefix` rows strip programme
+codes ("AASF - NOA Agribusiness Credit Line" is NOA Agribusiness, banking with
+the Albania Agribusiness Support Facility), `suffix` rows strip product words,
+`legal_suffix` rows are removed from the matching key but kept in the name,
+and `exclude` rows are labels that identify nobody.
+
+There is also a `not_a_prefix` section, which the code reads and ignores on
+purpose. It records leading acronyms that **look** like programme codes but are
+real clients — OTP Bank, TBC Bank, NLB, Development Bank of Ghana. An
+automatic "strip any leading acronym" rule would have deleted them, so the
+list exists to stop anyone re-deriving that rule from the data.
+
+What it finds today: **824 clients banked by two or more DFIs**, 183 by three
+or more, and 955 clients with three or more deals from a single institution.
+Vietnam Prosperity Bank has raised from six.
+
 ## Reviewing the data
 
 - **Excel:** `python export_review.py` writes `data/review_export.xlsx`
@@ -121,8 +172,39 @@ two ways worth knowing:
 
 Instruments live in their own table because of the one-to-many mapping;
 `projects.instrument` still holds each source's raw wording, untouched.
-Four institutions (AfDB, BII, EIB Global, FMO) publish no instrument at all —
+Three institutions (BII, EIB Global, FMO) publish no instrument at all —
 `harmonize.py` records why for each. See data_dictionary.md.
+
+## Recovering an instrument from a second publication
+
+```
+python enrich_afdb_instruments.py
+```
+
+AfDB's MapAfrica export has no instrument column, but AfDB publishes the same
+projects to IATI, where the finance type **is** stated. This step joins the
+two on AfDB's own project code — which appears in our `source_url` and in
+their `iati-identifier`, so it is an exact identifier match, never a title
+match — and fills `projects.instrument_enriched`. That took AfDB from **0% to
+78%** instrument coverage, about 4,700 deals.
+
+Three rules keep this honest:
+
+- It writes only `instrument_enriched`. **`projects.instrument` still means
+  "what the source we loaded published"**, and for AfDB that is still nothing.
+- **Enrichment fills silence and never argues with a disclosure.**
+  `harmonize.py` reads it only for projects whose loaded source published no
+  instrument.
+- Every canonical value records where it came from, in
+  `project_instruments.provenance`: `source_label`, `iati_enrichment`, or
+  `override`. So any chart can separate an institution's own instrument field
+  from one recovered elsewhere.
+
+The same check was run on ADB and EIB Global and **both were rejected** — ADB
+because nothing in its feed reliably separates its nonsovereign book from its
+sovereign lending, EIB because only ~21% of our loan parts appear in it and
+its feed stops in 2025. Both findings are recorded in `harmonize.py` so the
+question doesn't get reopened from scratch.
 
 The five canonical instrument values are declared once in `harmonize.py`
 (`CANONICAL_INSTRUMENTS`), and both instrument CSVs are checked against it —
@@ -156,17 +238,22 @@ file doing nothing.
 python test_instruments.py
 python test_es_categories.py
 python test_instrument_overrides.py
+python test_instrument_enrichment.py
+python test_counterparties.py
 ```
 
-Three suites, one per mapping mechanism — instruments are one-to-many into a
-child table, E&S is one-to-one into a column, and overrides are keyed per
-deal and replace rather than add — so a failure names the right thing. They
-prove: combined instruments produce a row each, deliberately-blank mappings
-stay silent, an unseen label is reported exactly once however many projects
-carry it, an override survives ids being reassigned, a value outside the
-vocabulary stops the run, a rerun changes nothing, and editing a CSV actually
-takes effect. Each exits non-zero on failure, so they can gate a commit, and
-each builds a throwaway database in memory and never touches the real one.
+Five suites, one per mechanism — instruments are one-to-many into a
+child table, E&S is one-to-one into a column, overrides are keyed per deal and
+replace rather than add, and enrichment may only fill silence — so a failure
+names the right thing. They prove: combined instruments produce a row each,
+deliberately-blank mappings stay silent, an unseen label is reported exactly
+once however many projects carry it, an override survives ids being
+reassigned, **enrichment never overwrites what a source published**, a
+"publishes no instrument" finding clears once the gap closes, a value outside
+the vocabulary stops the run, a rerun changes nothing, and editing a CSV
+actually takes effect. Each exits non-zero on failure, so they can gate a
+commit, and each builds a throwaway database in memory and never touches the
+real one.
 
 Always analyze by `canonical_country` / `canonical_region` /
 `canonical_sector` — the raw `country` and `region` columns keep each
@@ -190,7 +277,16 @@ institution's own spelling and are not comparable across institutions.
 - **AfDB:** bot protection blocks automated download. In your browser, open
   <https://mapafrica.afdb.org/en>, export the projects CSV, save it into
   `data\raw\` with a filename starting `afdb_mapafrica`, then run
-  `python -m scrapers.afdb` (it picks the newest matching file).
+  `python -m scrapers.afdb` (it picks the newest matching file). Follow it
+  with `python enrich_afdb_instruments.py`, which needs no download — it
+  fetches AfDB's IATI feed live.
+- **ADB caveat (important):** ADB has **not republished** this dataset since
+  the January 2025 edition, so its latest deal is dated 2024-12-03 and it
+  contributes nothing to 2025 or 2026. That is a gap at the source, not a
+  stale download — checked 2026-08-19. ADB's IATI feed *is* current, but it
+  does not distinguish its nonsovereign book from its sovereign lending, so it
+  cannot be used to fill the gap without guessing. Say so before comparing ADB
+  with the others on recent years.
 - **BII:** nothing to update — its IATI publication is refreshed
   continuously and the loader fetches it live each run.
 - **FMO:** nothing to update — crawled live from FMO's own world map. Note

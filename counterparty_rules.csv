@@ -1,0 +1,116 @@
+rule_type,pattern,notes
+prefix,FIF,EBRD Finance and Investment Facility - programme code, not the client
+prefix,DFF,EBRD Direct Financing Facility
+prefix,RSF,EBRD Risk Sharing Facility
+prefix,REGIONAL TFP,EBRD Trade Facilitation Programme (regional)
+prefix,TFP,EBRD Trade Facilitation Programme
+prefix,DLF,EBRD Direct Lending Facility
+prefix,MCFF,EBRD Medium-sized Co-Financing Facility
+prefix,RLF,EBRD Regional Leasing Facility
+prefix,RSBF,EBRD Risk Sharing for Bank Finance
+prefix,LEF,EBRD Local Enterprise Facility
+prefix,DIF,EBRD Direct Investment Facility
+prefix,RF,EBRD regional facility prefix
+prefix,GEFF,EBRD Green Economy Financing Facility
+prefix,GCF GEFF REGIONAL,Green Climate Fund / GEFF regional window
+prefix,WESTERN BALKANS GEFF III,GEFF regional window
+prefix,WESTERN BALKANS SME PLATFORM,EBRD regional SME platform
+prefix,CEEP,EBRD Central Europe Energy Programme
+prefix,WBCFF,Western Balkans Climate Finance Facility
+prefix,WBC,Western Balkans co-financing prefix
+prefix,USELF,Ukraine Sustainable Energy Lending Facility
+prefix,GRCF2 W2,EBRD Green Cities Framework window 2
+prefix,AASF,EBRD Albania Agribusiness Support Facility
+prefix,AATSF,EBRD Agribusiness Trade and Supply Facility
+prefix,EU/EBRD,EU co-financed EBRD window
+prefix,US/EBRD SME,US-EBRD SME facility
+prefix,EU/EBRD PHASE I,EU co-financed EBRD window
+prefix,SBI,EBRD Small Business Initiative
+prefix,DCFTA,EBRD Deep and Comprehensive Free Trade Area facility
+prefix,InvestEU,EU InvestEU window
+suffix,CREDIT LINE,the product not the client - 'NOA Agribusiness Credit Line' is NOA
+suffix,SME CREDIT LINE,product
+suffix,MSME CREDIT LINE,product
+suffix,SENIOR LOAN,product
+suffix,SYNDICATED LOAN,product
+suffix,SME LOAN,product
+suffix,MSME LOAN,product
+suffix,EQUITY INVESTMENT,product
+suffix,CAPITAL INCREASE,product
+suffix,RISK SHARING FACILITY,product - 'Intesa Sanpaolo Albania Risk Sharing Facility' is Intesa Sanpaolo Albania
+suffix,SUB PROJECT,sub-operation marker
+suffix,SUB-PROJECT,sub-operation marker
+suffix,NASIRA PORTFOLIO,FMO's NASIRA guarantee programme - the bank named before it is the client
+suffix,PORTFOLIO,generic trailing product word
+legal_suffix,S.A.,kept in the displayed name; removed only from the matching key
+legal_suffix,S.A,
+legal_suffix,SA,
+legal_suffix,S.A.S.,
+legal_suffix,LIMITED,
+legal_suffix,LTD,
+legal_suffix,LTD.,
+legal_suffix,PRIVATE LIMITED,
+legal_suffix,PVT LTD,
+legal_suffix,PTE LTD,
+legal_suffix,PLC,
+legal_suffix,LLC,
+legal_suffix,B.V.,
+legal_suffix,BV,
+legal_suffix,N.V.,
+legal_suffix,GMBH,
+legal_suffix,A.S.,
+legal_suffix,AS,
+legal_suffix,A/S,
+legal_suffix,L.P.,
+legal_suffix,LP,
+legal_suffix,INC,
+legal_suffix,INC.,
+legal_suffix,CORP,
+legal_suffix,CORP.,
+legal_suffix,JSC,
+legal_suffix,OJSC,
+legal_suffix,PJSC,
+legal_suffix,SICAV-RAIF,
+legal_suffix,SOCIEDAD ANONIMA,
+exclude,TBC,too short/generic to identify anyone
+exclude,N/A,
+exclude,VARIOUS,
+exclude,CONFIDENTIAL,
+exclude,REDACTED,
+exclude,UNDISCLOSED,
+prefix,GCF,Green Climate Fund co-financing marker
+prefix,ETC,EBRD Early Transition Countries window
+prefix,VCIP,EBRD Venture Capital Investment Programme
+prefix,AMBFF,EBRD agribusiness/municipal financing facility
+prefix,R2CF,EBRD regional renewable co-financing facility
+prefix,KSBP,Kazakhstan Small Business Programme
+prefix,REECL,Residential Energy Efficiency Credit Line
+prefix,EERECL,Energy Efficiency and Renewable Energy Credit Line
+prefix,SLOVSEFF,Slovak Sustainable Energy Finance Facility
+prefix,PSSF,EBRD private sector support facility
+prefix,SCSF,EBRD small communities support facility
+prefix,CEECAT,EBRD central/eastern Europe facility
+prefix,EUEEFF,EU Energy Efficiency Finance Facility
+prefix,AFSF,EBRD agri finance support facility
+suffix,BOND ISSUE,product
+suffix,SYNTHETIC LOAN,product
+suffix,MSE SYNTHETIC LOAN,product
+suffix,JUNIOR LOAN,product
+suffix,GEFF LOAN,product
+suffix,MRPA,BII master risk participation agreement - a product not a client
+suffix,TRADE FINANCE MRPA,product
+suffix,LOAN,generic trailing product word
+suffix,LOAN II,product
+suffix,LOAN I,product
+not_a_prefix,OTP,OTP Bank - a real EBRD client. Leading all-caps does not mean programme code.
+not_a_prefix,TBC,TBC Bank - a real client
+not_a_prefix,NLB,NLB Bank - a real client
+not_a_prefix,DBG,Development Bank of Ghana - a real client
+not_a_prefix,MBA,unverified - left alone rather than risk stripping a client name
+not_a_prefix,CVI,unverified
+not_a_prefix,VGP,unverified
+not_a_prefix,V4C,unverified
+not_a_prefix,ALFI,unverified
+not_a_prefix,LDC,unverified
+not_a_prefix,PPF,unverified
+not_a_prefix,RVF,unverified
