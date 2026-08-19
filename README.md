@@ -2,8 +2,9 @@
 
 Pipeline that loads public project disclosures from development finance
 institutions into a unified SQLite database (`data/dfi_tracker.db`).
-Sources so far: **DFC** (official Excel release) and **IFC** (WBG Finances
-One API). Field definitions: [data_dictionary.md](data_dictionary.md).
+Ten institutions: **DFC, IFC, EBRD, IDB Invest, ADB, AfDB, BII, FMO,
+Proparco** and **EIB Global**. Field definitions:
+[data_dictionary.md](data_dictionary.md).
 
 ## The routine
 
@@ -18,10 +19,10 @@ python -m scrapers.idbinvest # 1d. refresh IDB Invest (feed always current)
 python -m scrapers.adb      # 1e. refresh ADB (needs manual download — see below)
 python -m scrapers.afdb     # 1f. refresh AfDB (needs manual download — see below)
 python -m scrapers.bii      # 1g. refresh BII (IATI feed always current)
-python -m scrapers.fmo      # 1h. refresh FMO (crawls fmo.nl world map, ~2 min)
+python -m scrapers.fmo      # 1h. refresh FMO (world map + detail pages, ~25 min)
 python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
 python -m scrapers.eib      # 1j. refresh EIB Global (live service)
-python harmonize.py         # 2. apply sector_mapping.csv -> canonical sectors
+python harmonize.py         # 2. apply the four mapping CSVs (sector, country, instrument, E&S) + per-deal instrument overrides
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
 python export_review.py     # 5. (optional) full dump to data/review_export.xlsx
@@ -99,12 +100,75 @@ Two things baked in deliberately:
   `data/dfi_tracker.db` (read-only recommended: File → Open Database Read Only).
 - **Terminal:** `python verify.py` for the quick counts.
 
-## Editing the sector or country taxonomies
+## Editing the sector, country, instrument or E&S taxonomies
 
-Open `sector_mapping.csv` or `country_mapping.csv` (Excel is fine — keep
-them saved as CSV), change any canonical values, save, then run
-`python harmonize.py`. It reports any labels in the data that the CSVs
-don't cover. Always analyze by `canonical_country` / `canonical_region` /
+Open `sector_mapping.csv`, `country_mapping.csv`,
+`instrument_mapping.csv` or `es_category_mapping.csv` (Excel is fine — keep them saved as CSV), change
+any canonical values, save, then run `python harmonize.py`. It reports any
+labels in the data that the CSVs don't cover.
+
+`instrument_mapping.csv` works slightly differently from the other two, in
+two ways worth knowing:
+
+- **One raw label can map to several canonical instruments.** EBRD's
+  "Debt + Equity" has two rows in the CSV, and produces two rows in the
+  `project_instruments` table. Add or remove a row to change that.
+- **Leaving `canonical_instrument` blank is a decision, not an omission.**
+  A blank means "I looked at this and chose not to map it", and is silent.
+  Deleting the row entirely means "never seen", and gets reported. Use blank
+  when a label genuinely doesn't fit the five canonical values rather than
+  forcing a bad fit.
+
+Instruments live in their own table because of the one-to-many mapping;
+`projects.instrument` still holds each source's raw wording, untouched.
+Four institutions (AfDB, BII, EIB Global, FMO) publish no instrument at all —
+`harmonize.py` records why for each. See data_dictionary.md.
+
+The five canonical instrument values are declared once in `harmonize.py`
+(`CANONICAL_INSTRUMENTS`), and both instrument CSVs are checked against it —
+a misspelled value stops the run instead of quietly becoming a sixth
+instrument. Capitalisation is forgiven; unknown values are not.
+
+## Overriding the instrument on a single deal
+
+Some sources publish an instrument field that says nothing while the project
+description says plenty. IDB Invest has 41 deals labelled "Not Specified"
+whose descriptions plainly describe bond subscriptions, fund investments and
+guarantees. `instrument_overrides.csv` records a hand-reviewed decision for
+one named deal, applied on top of the label mapping:
+
+```
+institution,source_url,canonical_instrument,notes
+```
+
+It is keyed on `source_url`, **not** on the project's row id — ids are
+reassigned every time a loader reloads its institution, so an id would drift
+onto the wrong deal. Blank means the same thing here as everywhere else:
+reviewed, deliberately unmapped. Two things are deliberately noisy — an
+override that contradicts what the label mapping concluded is printed and
+logged as `instrument_overridden`, and an override whose URL matches no
+project is reported as `stale_instrument_override` rather than sitting in the
+file doing nothing.
+
+## Tests
+
+```
+python test_instruments.py
+python test_es_categories.py
+python test_instrument_overrides.py
+```
+
+Three suites, one per mapping mechanism — instruments are one-to-many into a
+child table, E&S is one-to-one into a column, and overrides are keyed per
+deal and replace rather than add — so a failure names the right thing. They
+prove: combined instruments produce a row each, deliberately-blank mappings
+stay silent, an unseen label is reported exactly once however many projects
+carry it, an override survives ids being reassigned, a value outside the
+vocabulary stops the run, a rerun changes nothing, and editing a CSV actually
+takes effect. Each exits non-zero on failure, so they can gate a commit, and
+each builds a throwaway database in memory and never touches the real one.
+
+Always analyze by `canonical_country` / `canonical_region` /
 `canonical_sector` — the raw `country` and `region` columns keep each
 institution's own spelling and are not comparable across institutions.
 

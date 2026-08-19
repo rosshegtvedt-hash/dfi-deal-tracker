@@ -406,6 +406,183 @@ visible without polluting country rankings; redacted/unknown labels map to
 `python harmonize.py`, and unmapped labels are reported and logged as
 `unmapped_country`.
 
+## Table: `project_instruments`
+
+Harmonized instruments, rebuilt by `harmonize.py` from
+`instrument_mapping.csv`. A **child table**, not a column on `projects`,
+because the mapping is one-to-many: EBRD's "Debt + Equity" is evidence for
+senior debt *and* equity, and a single column would silently drop half of
+every combined instrument.
+
+| Field | Type | Description |
+|---|---|---|
+| `project_id` | INTEGER | FK to `projects.id`, `ON DELETE CASCADE`, so a loader wiping its institution's rows clears these too. |
+| `canonical_instrument` | TEXT | One of the five canonical values below. |
+
+Unique on (`project_id`, `canonical_instrument`). To count deals by
+instrument, join — do not assume one row per project:
+
+```sql
+SELECT pi.canonical_instrument, COUNT(*)
+FROM project_instruments pi JOIN projects p ON p.id = pi.project_id
+GROUP BY 1;
+```
+
+**`projects.instrument` keeps the raw source value and is never modified.**
+
+## Instrument harmonization (`instrument_mapping.csv` + `harmonize.py`)
+
+Seeded from the sibling DFI Mandate Match project's mapping and extended to
+cover IDB Invest's 13 and ADB's 6 raw labels. Columns: `institution`,
+`raw_instrument`, `canonical_instrument`, `notes` — the notes column records
+the judgment behind each row, which matters because several are genuinely
+arguable.
+
+Canonical vocabulary (five values, deliberately small):
+**Senior debt · Equity · Guarantee · Political risk insurance ·
+Technical assistance / grant**
+
+Two rules make this work:
+
+- **One-to-many.** Several CSV rows may share an (institution, raw) key.
+  That is how "Debt + Equity", "Debt + Guarantee", "Debt + Equity +
+  Guarantee", "Loan & Equity" and "Loan & Guarantee" each produce two or
+  three canonical rows.
+- **Blank is not the same as absent.** A row present with an **empty**
+  `canonical_instrument` means "reviewed, deliberately not mapped" and is
+  *not* reported. A raw label with **no row at all** means "never seen" and
+  *is* logged as `unmapped_instrument` — one issue per distinct label, not
+  per project. Collapsing the two would hide new source labels behind old
+  decisions. Seven labels are deliberately blank, including IFC's "Risk
+  Management" (hedging products, no equivalent here), IDB Invest's "Not
+  Specified", and its "Debt Fund Participation" and "Fund" (LP commitments
+  to third-party funds: equity-like in form, debt in underlying exposure,
+  and the source does not say which it records — if capturing these matters,
+  a `Fund participation` canonical value would be the change to make).
+
+Several mappings are defensible rather than certain, and say so in `notes`:
+"Loan"/"Debt"/"Prêt" carry no seniority at source and are read as senior
+debt; subscribed bonds and one asset-backed security are read as debt
+without a stated rank.
+
+The five canonical values are declared once, as `CANONICAL_INSTRUMENTS` in
+`harmonize.py`, and **both** instrument CSVs are checked against it. A value
+outside the list stops the run rather than being written, because a typo
+would otherwise mint a sixth instrument and split every instrument chart in
+two. Capitalisation is forgiven ("Senior Debt" becomes "Senior debt") since
+these files are edited by hand in Excel and case drift is not a decision.
+Adding a value there is a **two-project decision** — the same vocabulary
+drives `../DFI Mandate Match/mandate_rules.csv`.
+
+## Per-deal instrument overrides (`instrument_overrides.csv`)
+
+Some sources publish an instrument field that says nothing while the project
+description names the instrument plainly. IDB Invest's 41 "Not Specified"
+deals are the case this was built for: the field declines to answer, but the
+descriptions are explicit about bond subscriptions, fund investments and
+guarantees. The override file records a hand-reviewed decision for **one
+named deal**, applied after the label mapping.
+
+Columns: `institution`, `source_url`, `canonical_instrument`, `notes`.
+
+- **Keyed on `source_url`, never on `projects.id`.** Ids are handed out
+  afresh every time a loader replaces its institution's rows, so an id-keyed
+  override would silently attach to a different deal after the next refresh.
+- **One-to-many and blank-vs-absent work exactly as in the label mapping.**
+  Several rows may share a URL; a blank canonical means "this deal was
+  reviewed and deliberately left unmapped" and stays silent.
+- **A blank override clears a value the label mapping produced.** That is the
+  point — it is how a deal whose label is wrong for it gets removed.
+- **Overriding is never quiet.** If an override contradicts a value the label
+  mapping already produced, the run prints it and logs
+  `instrument_overridden` with both the old and new values. A hand-written
+  file overruling the systematic one should always leave a trace.
+- **Overrides that match nothing are reported**, as
+  `stale_instrument_override` — the deal was probably renamed or withdrawn at
+  source, and a line doing nothing is worth knowing about.
+
+Current contents: all 41 IDB Invest "Not Specified" deals, reviewed by hand
+against their published descriptions — 22 senior debt, 3 equity, 3 guarantee,
+13 deliberately unmapped. The 13 break down as four bonds the source itself
+calls **subordinated** (mapping those to senior debt would record the
+opposite of the disclosure, and this vocabulary has no non-senior value),
+five LP interests in **private credit funds** (equity-like in form, debt in
+exposure — the same reading as "Debt Fund Participation"), three
+**receivables and payment facilities** (funded exposure, but nobody borrows
+and nothing ranks), and one deal whose page never names the financing.
+
+Two rows rest on the source's own **project title** rather than a
+description, and say so in `notes`: Rutas 2/7 and Cardal-Punta del Tigre,
+neither of which publishes a usable description. For Cardal the "B" denotes
+the syndicated tranche of an A/B structure — which ranks *pari passu*, not
+junior — so senior remains the default reading. **Open question recorded
+there:** whether B-tranche amounts are IDB Invest's own money or mobilised
+third-party capital. That is an amounts question, not an instrument one, and
+it would touch EBRD's B-loans too.
+
+### Institutions with no instrument data
+
+Four institutions have none, and `harmonize.py` logs one
+`instrument_absent_from_source` issue for each explaining **where we looked**,
+so "the source does not publish it" is never confused with "our loader does
+not collect it". The issues re-log on every run but only while the
+institution still has zero coverage, so they clear themselves if a loader is
+later taught to capture the field.
+
+| Institution | Finding (checked 2026-08-17) |
+|---|---|
+| AfDB | The MapAfrica bulk export has no instrument-like column at all. Absent from the source we read. |
+| BII | IATI carries instrument in the finance-type fields; BII leaves `default-finance-type-code` and `transaction_finance-type_code` empty on all 2,926 transactions while populating flow-type and aid-type. bii.co.uk could not be checked (HTTP 403 to automated requests). |
+| EIB Global | Neither the loans/list service (country, region and sector tags only) nor the public project page names a finance type. |
+| FMO | Checked directly: neither the world-map card nor the project-detail page names an instrument. **Not** a loader gap. Separately, the detail page *does* publish an E&S category that our loader does not capture — that one is a genuine loader gap. |
+
+## E&S category harmonization (`es_category_mapping.csv` + `harmonize.py`)
+
+`projects.es_category` holds each institution's own risk grade, in its own
+dialect — IFC's `B - Limited`, DFC's `FI A/Fund A`, AfDB's `Category 1`,
+IDB Invest's `FI-2`, Proparco's `B+`, FMO's `B+`. `canonical_es_category`
+holds the harmonized level. **`es_category` is never modified.**
+
+Unlike instruments, E&S is **one-to-one** — one grade means exactly one risk
+level — so it is a column on `projects`, not a child table. Columns:
+`institution`, `raw_es_category`, `canonical_es_category`, `source_url`,
+`notes`; the `source_url` cites the policy defining the grade.
+
+Canonical vocabulary (seven values, from the sibling project):
+**High · Substantial · Moderate · Low · FI high · FI moderate · FI low**
+
+`Substantial` exists because AFD/Proparco and FMO use a four-level
+A/B+/B/C scale; folding `B+` into High or Moderate would misstate ~250 deals.
+
+Blank-vs-absent works exactly as it does for instruments: a **blank**
+canonical means "reviewed, deliberately unmapped" and is silent; a grade
+with **no row at all** is logged as `unmapped_es_category`, once per
+distinct label. **13 labels are deliberately blank**, including AfDB's
+`Category 4` and `FI-A/B/C` (a later AfDB scheme the readable 2015 ESAP does
+not define), Proparco's `IF-A/B/C` (almost certainly FI levels, but AFD's
+framework documents only A/B+/B/C), DFC's `D` (no Category D exists in the
+current ESPP; these are OPIC-era records), IFC's bare `FI`, and explicit
+non-classifications like `Redacted` and `Pas de classement`.
+
+Two mappings are **read-across, not quotation**, and say so in `notes`:
+IDB Invest's A/B/C and FI-1/2/3 use labels identical to IFC's and are read
+from IFC's published definitions because idbinvest.org returns HTTP 403 to
+automated access; FMO's A/B+/B/C is read from the AFD four-level scale its
+own page label mirrors.
+
+### Institutions with no E&S grade
+
+`harmonize.py` logs one `es_category_absent_from_source` issue per
+institution, and each says where we looked. Two of the four are **our gap**,
+not the institution withholding it:
+
+| Institution | Finding (checked 2026-08-18) |
+|---|---|
+| EBRD | The investments-overview spreadsheet has no E&S column. EBRD publishes per-project Project Summary Documents this loader does not fetch — **very likely our gap**; the PSD format could not be confirmed here (the URL tried returned 404). |
+| ADB | The Nonsovereign Products spreadsheet has no safeguard column. ADB publishes safeguard categories on per-project pages this loader does not fetch and which could not be checked (adb.org returns HTTP 403). **Treat as our gap, unconfirmed.** |
+| BII | Loaded from IATI, and the IATI activity standard has no E&S category element at all — there is no field to populate. Absent from the source we read. |
+| EIB Global | Neither the loans/list service nor the project page states a category; the page carries an Environmental and Social Data Sheet document and prose instead. Verified directly. |
+
 ## Duplicate flagging (`dedupe.py`)
 
 Fuzzy-matches project name + country + year (±1, since institutions'

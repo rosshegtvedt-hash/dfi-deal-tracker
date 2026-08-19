@@ -1,0 +1,58 @@
+institution,raw_instrument,canonical_instrument,notes
+IFC,Loan,Senior debt,"IFC's 'Loan' does not distinguish senior from subordinated. Treated as senior debt, which is the large majority of IFC's book."
+IFC,Equity,Equity,
+IFC,Guarantee,Guarantee,
+IFC,Risk Management,,"Hedging and derivative products. No equivalent in this project's instrument vocabulary, so deliberately left unmapped rather than forced into one."
+DFC,Direct Lending,Senior debt,
+DFC,Unfunded Guaranty,Guarantee,
+DFC,Political Risk Insurance,Political risk insurance,
+DFC,Political Risk Insurance (Annex),Political risk insurance,
+DFC,Equity,Equity,
+DFC,Technical Assistance,Technical assistance / grant,
+DFC,Redacted,,DFC withheld the instrument on these records.
+EBRD,Debt,Senior debt,"EBRD's 'Debt' is a single coarse bucket covering senior AND subordinated lending. Mapped to senior debt because that is the bulk of it, but EBRD subordinated-debt activity is therefore invisible here."
+EBRD,Equity,Equity,
+EBRD,Guarantee,Guarantee,
+EBRD,Debt + Equity,Senior debt,"Combined instrument: this deal counts as evidence for BOTH senior debt and equity."
+EBRD,Debt + Equity,Equity,Combined instrument - see the paired row.
+EBRD,Debt + Guarantee,Senior debt,Combined instrument - see the paired row.
+EBRD,Debt + Guarantee,Guarantee,Combined instrument - see the paired row.
+EBRD,Equity + Guarantee,Equity,Combined instrument - see the paired row.
+EBRD,Equity + Guarantee,Guarantee,Combined instrument - see the paired row.
+EBRD,Debt + Equity + Guarantee,Senior debt,Combined instrument - see the paired rows.
+EBRD,Debt + Equity + Guarantee,Equity,Combined instrument - see the paired rows.
+EBRD,Debt + Equity + Guarantee,Guarantee,Combined instrument - see the paired rows.
+Proparco,Prêt,Senior debt,"French for 'loan'. Like IFC's 'Loan' and EBRD's 'Debt', it does not distinguish senior from subordinated."
+Proparco,prêt durable,Senior debt,"'Sustainable loan' - a lower-case variant of Prêt in the source data."
+Proparco,Prise de participation,Equity,French for 'equity stake'.
+Proparco,Prise de participation de 15 MUSD,Equity,"Equity. The deal size has been typed into the instrument field at source; the label is left verbatim rather than corrected."
+Proparco,Fds Propres,Equity,"Abbreviation of 'fonds propres' (own funds / equity)."
+Proparco,Garantie,Guarantee,French for 'guarantee'.
+Proparco,garantie,Guarantee,Lower-case variant of Garantie in the source data.
+Proparco,Gar Donnée,Guarantee,"Abbreviation of 'garantie donnée' (guarantee given)."
+Proparco,Subvention,Technical assistance / grant,French for 'grant'.
+Proparco,Accompagnement technique,Technical assistance / grant,French for 'technical support'.
+Proparco,Obligation,Senior debt,"French for 'bond'. This vocabulary has no separate bond instrument; a subscribed bond is debt, and senior is the default reading. Flagged here because the source does not state seniority."
+Proparco,Autres titres,,"'Other securities' - too vague to place. Could be debt or equity, so deliberately unmapped."
+Proparco,Prêt sousjacent des obligations souscrites par Proparco,,"'Underlying loan of the bonds subscribed by Proparco' - a structure, not a clean instrument. One record; deliberately unmapped rather than forced."
+IDB Invest,Loan,Senior debt,"Like IFC's 'Loan' and EBRD's 'Debt', IDB Invest's 'Loan' does not state seniority."
+IDB Invest,Equity,Equity,
+IDB Invest,Guarantee,Guarantee,
+IDB Invest,Loan & Equity,Senior debt,"Combined instrument: this deal counts as evidence for BOTH senior debt and equity."
+IDB Invest,Loan & Equity,Equity,Combined instrument - see the paired row.
+IDB Invest,Loan & Guarantee,Senior debt,Combined instrument - see the paired row.
+IDB Invest,Loan & Guarantee,Guarantee,Combined instrument - see the paired row.
+IDB Invest,Project Finance Loan,Senior debt,"A project-finance loan. Seniority is not stated; senior is the default reading, as for the other loan labels."
+IDB Invest,Bond,Senior debt,"A subscribed bond, following the same reading as Proparco's 'Obligation'. The source does not state seniority."
+IDB Invest,Domestic Bond,Senior debt,"Local-currency bond subscription. Same reading as 'Bond'; seniority not stated at source."
+IDB Invest,International Bond,Senior debt,"Hard-currency bond subscription. Same reading as 'Bond'; seniority not stated at source."
+IDB Invest,Domestic Asset-Backed Security,Senior debt,"A subscribed securitisation (social mortgage-backed). A subscribed debt security, so read as debt; ABS tranches can be junior and the source does not say which, so this is flagged rather than certain."
+IDB Invest,Not Specified,,"The source explicitly declines to state the instrument. Deliberately unmapped. (Several of these read as bond subscriptions in their project descriptions, but the instrument field itself says nothing, and inferring an instrument from a different field is not something this mapping does.)"
+IDB Invest,Debt Fund Participation,,"An anchor or limited-partner commitment to a third-party debt fund. Equity-like in form (an LP interest) but debt in underlying exposure, and the source does not say which it is recording. Deliberately unmapped rather than forced; see the note in data_dictionary.md about adding a fund-participation instrument if this matters."
+IDB Invest,Fund,,"Names a vehicle, not an instrument - the source says only that IDB Invest invested in a fund. Deliberately unmapped."
+ADB,Loan,Senior debt,"ADB's 'Loan' does not state seniority; senior is the default reading, as for IFC and IDB Invest."
+ADB,Equity,Equity,
+ADB,Guarantee,Guarantee,
+ADB,Grant,Technical assistance / grant,
+ADB,TA,Technical assistance / grant,"ADB's abbreviation for technical assistance; the one record's own description calls it 'The technical assistance (TA)'."
+ADB,EI,Equity,"ADB's abbreviation for equity investment; the one record's own description says ADB 'will make an equity investment of up to $50 million'."

@@ -42,6 +42,7 @@ CREATE TABLE IF NOT EXISTS projects (
     canonical_sector    TEXT,           -- harmonized sector (set by harmonize.py)
     canonical_subsector TEXT,           -- harmonized subsector (set by harmonize.py)
     probable_duplicate_group TEXT,      -- group ID for likely co-financed deals (set by dedupe.py)
+    canonical_es_category TEXT,         -- harmonized E&S risk level (set by harmonize.py)
     canonical_country   TEXT,           -- harmonized country name (set by harmonize.py)
     canonical_region    TEXT            -- harmonized region (set by harmonize.py)
 );
@@ -58,6 +59,22 @@ CREATE TABLE IF NOT EXISTS quality_issues (
     logged_at    TEXT NOT NULL
 );
 
+-- Harmonized instruments, set by harmonize_instruments.py from
+-- instrument_mapping.csv. A CHILD TABLE rather than a column on projects,
+-- because the mapping is one-to-many: EBRD's "Debt + Equity" is evidence for
+-- senior debt AND equity, and a single column would silently drop half of
+-- every combined instrument. projects.instrument keeps the raw source value
+-- and is never modified.
+CREATE TABLE IF NOT EXISTS project_instruments (
+    project_id           INTEGER NOT NULL,
+    canonical_instrument TEXT    NOT NULL,
+    UNIQUE (project_id, canonical_instrument),
+    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_instruments_instrument
+    ON project_instruments (canonical_instrument);
+
 CREATE INDEX IF NOT EXISTS idx_projects_institution ON projects (institution);
 CREATE INDEX IF NOT EXISTS idx_projects_country     ON projects (country);
 CREATE INDEX IF NOT EXISTS idx_projects_sector      ON projects (sector);
@@ -71,6 +88,7 @@ MIGRATIONS = [
     ("canonical_sector", "TEXT"),
     ("canonical_subsector", "TEXT"),
     ("probable_duplicate_group", "TEXT"),
+    ("canonical_es_category", "TEXT"),
     ("canonical_country", "TEXT"),
     ("canonical_region", "TEXT"),
 ]
@@ -81,6 +99,10 @@ def get_connection() -> sqlite3.Connection:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # lets us access columns by name
+    # SQLite ignores foreign keys unless asked, per connection. With this on,
+    # a loader wiping its institution's projects also clears that institution's
+    # project_instruments rows (ON DELETE CASCADE) instead of orphaning them.
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(SCHEMA)
     existing = {row[1] for row in conn.execute("PRAGMA table_info(projects)")}
     for column, sql_type in MIGRATIONS:

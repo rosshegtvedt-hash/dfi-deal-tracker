@@ -72,11 +72,19 @@ amount_usd = NULL plus a logged 'fx_rate_missing', as elsewhere.
 DATES are the disclosure date shown on the card, which is FMO's publication
 date for the investment rather than a board-approval date.
 
-NOT PUBLISHED on the card, left NULL rather than inferred: instrument,
-sponsor, es_category.
+E&S CATEGORY comes from each project-DETAIL page, which publishes an
+"Environmental & Social Category (A, B+, B or C)" field the cards omit. That
+is one request per project, so a full run is ~1,400 detail pages on top of
+~90 list pages and takes roughly 25 MINUTES at the polite delay. A page with
+no grade stores NULL; a page showing something outside A/B+/B/C stores NULL
+and logs it, rather than inventing a category.
+
+NOT PUBLISHED anywhere in this source, left NULL rather than inferred: instrument,
+sponsor.
 """
 
 import html as html_lib
+import json
 import re
 import sys
 import time
@@ -93,7 +101,9 @@ from fx import to_usd  # noqa: E402
 
 INSTITUTION = "FMO"
 BASE_URL = "https://www.fmo.nl/world-map"
+DETAIL_URL = "https://www.fmo.nl/project-detail/{}"
 RAW_DIR = Path(__file__).parent.parent / "data" / "raw"
+ES_CACHE = RAW_DIR / "fmo_es_category_cache.json"
 UA_HEADER = {"User-Agent": "RCFH-Advisory DFI tracker (contact: rosshegtvedt@gmail.com)"}
 DELAY_SECONDS = 0.7
 PAGE_LIMIT = 200          # stop runaway pagination if the markup ever changes
@@ -114,6 +124,18 @@ FUNDS = {
 # crawl or the markup broke, and loading it would replace good data with a
 # fragment.
 MIN_EXPECTED_PROJECTS = 800
+
+# The detail page carries an E&S grade the world-map card does not. The label
+# is rendered as "Environmental & Social Category (A, B+, B or C)" followed by
+# the grade itself.
+ES_LABEL_RE = re.compile(
+    r"Environmental\s*&(?:amp;)?\s*Social\s*Category\s*\(A,\s*B\+,\s*B\s*or\s*C\)\s*"
+    r"([^\s<]{1,12})", re.I)
+# Grades FMO actually uses. Anything else is treated as "no grade published"
+# and logged, rather than stored as if it were a category.
+ES_VALUES = {"A", "B+", "B", "C"}
+TAG_RE = re.compile(r"<[^>]+>")
+SCRIPT_RE = re.compile(r"<script.*?</script>", re.S | re.I)
 
 ITEM_RE = re.compile(
     r"<li class='ProjectList__item'[^>]*data-project-id='(?P<pid>\d+)'>.*?"
@@ -155,6 +177,68 @@ def parse_page(html):
                 rec["status"] = span
         out.append(rec)
     return out
+
+
+def fetch_es_category(session, project_id):
+    """E&S grade from one project-detail page.
+
+    Returns (grade_or_None, note_or_None). A page that publishes no grade
+    yields (None, None) — common and not an anomaly. A page showing something
+    outside FMO's own A / B+ / B / C scale yields a note, because storing it
+    silently would invent a category.
+    """
+    try:
+        resp = session.get(DETAIL_URL.format(project_id), timeout=90)
+    except requests.RequestException as exc:
+        return None, f"detail page could not be fetched ({type(exc).__name__})"
+    if resp.status_code != 200:
+        return None, f"detail page returned HTTP {resp.status_code}"
+
+    text = re.sub(r"\s+", " ", TAG_RE.sub(" ", SCRIPT_RE.sub(" ", resp.text)))
+    match = ES_LABEL_RE.search(text)
+    if not match:
+        return None, None                      # page simply has no grade
+    value = html_lib.unescape(match.group(1)).strip().rstrip(".,;")
+    if value not in ES_VALUES:
+        return None, (f"detail page shows {value!r} where an E&S grade was "
+                      "expected; stored as NULL rather than as a category")
+    return value, None
+
+
+def add_es_categories(session, projects):
+    """Visit every project's detail page for its E&S grade.
+
+    This is the slow half of the loader — one request per project, ~1,400 on
+    top of the ~90 list pages — so results are CACHED to disk as they arrive
+    and a rerun only fetches what is still missing. A dropped connection or a
+    closed laptop therefore costs a few pages, not the whole crawl. Delete
+    ES_CACHE to force a full refresh.
+    """
+    cache = {}
+    if ES_CACHE.exists():
+        cache = json.loads(ES_CACHE.read_text(encoding="utf-8"))
+    todo = [p for p in projects if p["id"] not in cache]
+    print(f"E&S detail pages: {len(cache)} cached, {len(todo)} to fetch "
+          f"(~{len(todo) * DELAY_SECONDS / 60:.0f} min at {DELAY_SECONDS}s each)")
+
+    for n, proj in enumerate(todo, 1):
+        grade, note = fetch_es_category(session, proj["id"])
+        cache[proj["id"]] = {"es_category": grade, "es_note": note}
+        if n % 100 == 0 or n == len(todo):
+            ES_CACHE.write_text(json.dumps(cache), encoding="utf-8")
+            got = sum(1 for v in cache.values() if v["es_category"])
+            print(f"  {n}/{len(todo)} fetched, {got} of {len(cache)} have a grade")
+        time.sleep(DELAY_SECONDS)
+    ES_CACHE.write_text(json.dumps(cache), encoding="utf-8")
+
+    for proj in projects:
+        entry = cache.get(proj["id"], {})
+        proj["es_category"] = entry.get("es_category")
+        proj["es_note"] = entry.get("es_note")
+    missing = sum(1 for p in projects if p["id"] not in cache)
+    if missing:
+        print(f"  WARNING: {missing} projects still unfetched — rerun to finish")
+    return projects
 
 
 def make_session():
@@ -291,6 +375,11 @@ def load(projects) -> None:
                                   "card shows no country", p)
                 issues += 1
 
+            if p.get("es_note"):
+                log_quality_issue(conn, INSTITUTION, name,
+                                  "unresolved_es_category", p["es_note"], p)
+                issues += 1
+
             amount, currency, amount_usd = p["amount"], p["currency"], None
             if amount is None:
                 log_quality_issue(conn, INSTITUTION, name, "missing_amount",
@@ -329,7 +418,7 @@ def load(projects) -> None:
                     approval_date,
                     None,
                     p["status"],
-                    None,   # es_category: not on the card
+                    p.get("es_category"),
                     None,   # sponsor: not on the card
                     description,
                     p["url"],
@@ -348,5 +437,6 @@ def load(projects) -> None:
 if __name__ == "__main__":
     print(f"Crawling {BASE_URL} by fund")
     all_projects = fetch_all()
+    all_projects = add_es_categories(make_session(), all_projects)
     archive(all_projects)
     load(all_projects)
