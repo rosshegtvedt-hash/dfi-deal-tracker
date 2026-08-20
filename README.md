@@ -79,6 +79,15 @@ python export_charts.py
 Writes seven LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
 time, top countries, sector mix, average ticket size, co-financing pairs,
 labelled debt by institution, and mobilisation.
+
+Two of them count **operations, not rows**. EIB Global discloses loan
+tranches rather than whole projects and EBRD splits some facilities, so a
+single deal can arrive as many rows — EIB's "Global Green Bond Initiative"
+is 24 rows sharing one name and one date. Rows sharing an institution, a
+name and a date are summed back into one operation first. Without that,
+the labelled-debt chart showed EIB with 29 labels instead of 3, and the
+ticket-size chart understated EIB by 27% and EBRD by 17%.
+
 Every chart is drawn inside one shared frame that stamps the RCFH Advisory
 wordmark and the **source attribution footer** — the footer belongs to the
 frame, not to each chart, so a published chart cannot lose it.

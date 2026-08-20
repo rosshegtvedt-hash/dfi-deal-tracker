@@ -355,21 +355,35 @@ def chart_sectors(rows, as_of):
 
 
 def chart_ticket_size(rows, as_of):
+    """Average cheque size, per OPERATION rather than per row.
+
+    EIB Global and EBRD both split a single operation across several
+    disclosed rows - EIB by loan tranche, EBRD for some facilities. Averaging
+    rows therefore divided one cheque by the number of slices it arrived in,
+    understating EIB Global by 27% ($57.2m against $77.8m) and EBRD by 17%.
+    Summing to the operation first is the like-for-like comparison, since
+    IFC, DFC and the others already publish one row per deal.
+    """
     data = recent(rows)
-    per = {}
+    # Sum the slices of one operation back together before averaging.
+    operations = {}
     for r in data:
-        per.setdefault(r["institution"], []).append(r["amount_usd"])
+        key = (r["institution"], (r["project_name"] or "").lower(), r["year"])
+        operations[key] = operations.get(key, 0) + r["amount_usd"]
+    per = {}
+    for (institution, _, _), amount in operations.items():
+        per.setdefault(institution, []).append(amount)
     stats = sorted(((k, sum(v) / len(v)) for k, v in per.items() if len(v) >= 20),
                    key=lambda kv: -kv[1])
     return hbar_chart(
         [k for k, _ in stats], [v for _, v in stats],
         "Who writes what size cheque",
-        "Average disclosed commitment per deal, 2015–2024. The spread is what a\n"
-        "sponsor is really choosing between when picking a financier.",
+        "Average disclosed commitment per operation, 2015-2024. The spread is what\n"
+        "a sponsor is really choosing between when picking a financier.",
         as_of, "04_ticket_size.png",
-        note=("EIB Global publishes loan tranches rather than whole projects, so its "
-              "average is per tranche.\nInstitutions with fewer than 20 deals in the "
-              "window are omitted."))
+        note=("Rows that share an institution, a name and a year are summed back into one operation first:\n"
+              "EIB Global discloses loan tranches and EBRD splits some facilities, and averaging the slices\n"
+              "understated them. Institutions with fewer than 20 operations in the window are omitted."))
 
 
 def chart_cofinancing(rows, as_of):
@@ -415,47 +429,56 @@ THEME_COLORS = {
 def chart_thematic(as_of):
     """Who issues labelled debt, and in which flavour.
 
-    A COMPOSITION chart rather than a time series, and that is the point.
-    The year-by-year count swings hard — 27, 12, 33 across 2022–2024 — but the
-    swing is almost entirely one institution: EBRD booked ten green bonds in
-    2021, seven in 2022, NONE in 2023 and four in 2024. Take EBRD out and the
-    rest is flat noise between two and eight a year. At this sample size a
-    trend line would dress one lender's programme decisions up as a market
-    signal, so the chart shows composition, which is stable, instead.
+    COUNTS OPERATIONS, NOT ROWS. EIB Global's grain is loan PARTS, so its
+    "Global Green Bond Initiative" arrives as 24 rows sharing one name and one
+    date — counting rows showed EIB with 29 labels when it has 3, and put it
+    fourth on this chart. EBRD splits some operations the same way: "CTP Green
+    Bond" is six rows on a single date.
+
+    The rule is (institution, name, approval date), not name alone. EBRD
+    genuinely returns to the same client — "ONCF Green Bond" was signed in
+    2022 and again in 2025 — and those are two operations, not one. Collapsing
+    on name alone would have under-counted EBRD by three.
+
+    A COMPOSITION chart rather than a time series, and that is deliberate.
+    The year-by-year count swings hard, but the swing is almost entirely one
+    institution: EBRD booked ten green bonds in 2021, seven in 2022, NONE in
+    2023 and four in 2024. Take EBRD out and the rest is flat noise between
+    two and eight a year. At this sample size a trend line would dress one
+    lender's programme decisions up as a market signal.
     """
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    # One row per (operation, theme). The inner DISTINCT is what collapses
+    # tranche-split rows into the operation they belong to.
+    operations = """
+        SELECT DISTINCT p.institution inst, lower(p.project_name) nm,
+               COALESCE(p.approval_date, '') dt, t.theme, t.labelled_instrument li
+        FROM projects p JOIN project_themes t ON t.project_id = p.id
+    """
     rows = conn.execute(
-        """SELECT p.institution, t.theme, COUNT(DISTINCT p.id) n
-           FROM projects p JOIN project_themes t ON t.project_id = p.id
-           GROUP BY 1, 2""").fetchall()
-    # Order by LABELS, the same quantity the bar length shows. Ordering by
-    # deals instead put IDB Invest's 77 labels below EBRD's 74, because a deal
-    # carrying two labels is one deal and two segments.
+        f"SELECT inst, theme, COUNT(*) n FROM ({operations}) GROUP BY 1, 2"
+    ).fetchall()
     order = [r[0] for r in conn.execute(
-        """SELECT p.institution FROM projects p
-           JOIN project_themes t ON t.project_id = p.id
-           GROUP BY p.institution ORDER BY COUNT(*) DESC""")]
-    deals, labels, bonds, loans = conn.execute(
-        """SELECT COUNT(DISTINCT project_id), COUNT(*),
-                  COUNT(DISTINCT CASE WHEN labelled_instrument = 'bond'
-                                      THEN project_id END),
-                  COUNT(DISTINCT CASE WHEN labelled_instrument = 'loan'
-                                      THEN project_id END)
-           FROM project_themes""").fetchone()
+        f"SELECT inst FROM ({operations}) GROUP BY inst ORDER BY COUNT(*) DESC")]
+    ops, labels, bonds, loans = conn.execute(f"""
+        SELECT COUNT(DISTINCT inst || '|' || nm || '|' || dt), COUNT(*),
+               SUM(CASE WHEN li = 'bond' THEN 1 ELSE 0 END),
+               SUM(CASE WHEN li = 'loan' THEN 1 ELSE 0 END)
+        FROM ({operations})""").fetchone()
     conn.close()
 
-    counts = {(r["institution"], r["theme"]): r["n"] for r in rows}
+    counts = {(r["inst"], r["theme"]): r["n"] for r in rows}
     order = order[::-1]                       # barh draws bottom-up
 
     fig, ax = brand_frame(
         "Who issues labelled debt",
-        f"{labels} labels across {deals} deals and ten institutions, by the\n"
+        f"{labels} labels across {ops} operations and ten institutions, by the\n"
         "label the issuer itself gave each one.",
         as_of,
-        note=(f"Bars count LABELS, not deals: {labels} labels sit on {deals} deals - a bond can be both social and gender.\n"
-              f"Bonds and loans both count ({bonds} bonds, {loans} loans): a green loan is labelled under the Loan Market\n"
-              "Association's principles exactly as a green bond is under ICMA's. Counts are a floor."),
+        note=(f"Bars count LABELS: {labels} on {ops} operations — one bond can be both social and gender. Bonds and loans\n"
+              f"both count ({bonds} and {loans}); repeated tranches of one operation are counted once, which is why EIB\n"
+              "Global shows 3 and not 29. Counts are a floor: they depend on the issuer using a recognised phrase."),
         left=0.135)
 
     left = {i: 0 for i in order}

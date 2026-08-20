@@ -900,3 +900,33 @@ contributes 27 rows carrying only **2 distinct names** — the "Global Green
 Bond Initiative" counted once per loan tranche, because EIB's grain is loan
 parts, not projects. Counting rows there would have shown a 2026 boom that is
 one programme.
+
+### Rows versus operations
+
+`project_themes` has one row per project row, and for most institutions that
+is one row per deal. **EIB Global and EBRD are different**: EIB discloses loan
+*tranches* rather than whole projects, and EBRD splits some facilities the
+same way. EIB's "Global Green Bond Initiative" is 24 rows sharing one name and
+one date; EBRD's "CTP Green Bond" is six.
+
+So counting rows and counting deals give different answers, and both are
+legitimate depending on the question:
+
+| Basis | Deals / labels | EIB Global |
+|---|---|---|
+| Project rows | 265 deals, 274 labels | 29 |
+| Operations — (institution, name, date) | 221 operations, 230 labels | 3 |
+
+`export_charts.py` counts **operations**, because "how many green bonds did
+EIB do" should not answer 29 when the answer is 3.
+
+The rule is (institution, name, **date**), not name alone. EBRD genuinely
+returns to the same client — "ONCF Green Bond" was signed in 2022 and again in
+2025 — and those are two operations. Collapsing on name alone under-counted
+EBRD by three.
+
+The same correction applies to the **average ticket size** chart, where
+averaging tranches divided one cheque by the number of slices it arrived in:
+EIB Global was understated by 27% ($57.2m per row against $77.8m per
+operation) and EBRD by 17%. On the corrected basis EIB Global has the largest
+average commitment of the ten, not a mid-table one.
