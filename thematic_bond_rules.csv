@@ -1,0 +1,25 @@
+theme,phrase,notes
+Green bond,green bond,ICMA Green Bond Principles - proceeds to environmental projects
+Green bond,green note,same label on a note rather than a bond
+Green bond,green sukuk,Islamic-finance equivalent
+Social bond,social bond,ICMA Social Bond Principles - proceeds to social outcomes
+Social bond,social note,same label on a note
+Sustainability bond,sustainable bond,"use-of-proceeds bond mixing green and social. NOT the same as a sustainability-LINKED bond"
+Sustainability bond,sustainability bond,variant spelling of the same label
+Sustainability-linked bond,sustainability-linked bond,"coupon steps if KPIs are missed. A PERFORMANCE-linked structure, not use-of-proceeds - deliberately a separate theme"
+Sustainability-linked bond,sustainability linked bond,unhyphenated variant
+Sustainability-linked bond,sustainability-linked note,same structure on a note
+Blue bond,blue bond,proceeds to ocean and water projects
+Blue bond,blue note,same label on a note
+Gender bond,gender bond,proceeds to women-led or women-serving businesses
+Gender bond,social gender bond,"issuers combine the two labels; the row gets BOTH themes, since it is both"
+Gender bond,gender focus,"as in 'Social Bond with a Gender Focus'. Only counted on rows that are already bonds - see the bond test in derive_thematic_bonds.py"
+Gender bond,gender lens,"as in 'Social Bond with a Gender Lens'"
+Gender bond,gender and inclusion,"as in 'Social Bond of Gender and Inclusion'"
+Gender bond,women entrepreneurs empowerment bond,Fedecredito's own name for its gender bond
+exclude_phrase,climate bonds initiative,"a CERTIFIER's name, not a label on the deal. It tagged an explicit green LOAN as a green bond. 'climate bond' had exactly 1 match in the whole database and it was this one, so the phrase was removed entirely."
+exclude_phrase,green bond principles,ICMA framework name - describes the standard a bond follows, not what this deal is
+exclude_phrase,social bond principles,"ICMA framework name. A sustainability bond is aligned with BOTH the green and social principles by definition, so the phrase is weak evidence of a social bond."
+exclude_phrase,sustainability bond guidelines,ICMA framework name
+exclude_phrase,sustainability-linked bond principles,ICMA framework name
+exclude_phrase,social bond guidelines,ICMA framework name

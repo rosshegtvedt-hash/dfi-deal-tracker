@@ -24,6 +24,7 @@ python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
 python -m scrapers.eib      # 1j. refresh EIB Global (live service)
 python enrich_afdb_instruments.py  # 1k. recover AfDB's instrument from its own IATI feed
 python derive_counterparties.py    # 1l. work out who each deal was WITH
+python derive_thematic_bonds.py    # 1m. tag green / social / blue / gender bonds
 python harmonize.py         # 2. apply the four mapping CSVs (sector, country, instrument, E&S) + per-deal instrument overrides
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
@@ -164,6 +165,36 @@ the loader used as a fallback, putting **$10.08bn of group-level money into
 IDB Invest's totals**. Those 248 records now load with a NULL amount and a
 `group_level_amount` issue. IDB Invest fell from $48.91bn to $38.83bn.
 
+## Thematic bonds (green, social, blue, gender)
+
+```
+python derive_thematic_bonds.py
+```
+
+Tags **217 deals across all ten institutions** with the label the issuer gave
+them: 119 green, 35 sustainability, 32 social, 18 sustainability-linked, 12
+blue, 8 gender. Six deals carry more than one label, because a "Social Bond
+with a Gender Focus" genuinely is both.
+
+**A theme is not an instrument.** A green bond is a senior bond that happens
+to be green, so themes live in their own `project_themes` table. Putting them
+in the instrument vocabulary would break every "what share is equity"
+denominator.
+
+Deriving this is safe in a way that deriving an *instrument* is not: the
+issuer names the bond. We record a label, we do not deduce a structure. Three
+guards keep it honest, and each caught something real:
+
+- only literal phrases from `thematic_bond_rules.csv` match;
+- a phrase only counts on a row that **is already a bond** — otherwise
+  "gender focus" tags equity deals;
+- framework names are stripped first, because "Climate Bonds Initiative" is a
+  certifier and "Social Bond Principles" is a standard. The first of those
+  tagged an explicit green **loan** as a green bond.
+
+Counts are a floor: they depend on the issuer using a recognised phrase.
+Thematic **loans** are deliberately out of scope. See data_dictionary.md.
+
 ## Reviewing the data
 
 - **Excel:** `python export_review.py` writes `data/review_export.xlsx`
@@ -264,9 +295,10 @@ python test_instrument_overrides.py
 python test_instrument_enrichment.py
 python test_counterparties.py
 python test_mobilisation.py
+python test_thematic_bonds.py
 ```
 
-Six suites, one per mechanism — instruments are one-to-many into a
+Seven suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
 replace rather than add, and enrichment may only fill silence — so a failure
 names the right thing. They prove: combined instruments produce a row each,

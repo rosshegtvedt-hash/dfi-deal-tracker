@@ -88,6 +88,24 @@ CREATE TABLE IF NOT EXISTS project_instruments (
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
 
+-- Thematic bond labels (green, social, blue, ...), set by
+-- derive_thematic_bonds.py from thematic_bond_rules.csv. A CHILD TABLE for
+-- the same reason as instruments: one bond is routinely two things at once,
+-- e.g. a "Social Bond with a Gender Focus" is both social and gender.
+--
+-- This is a USE-OF-PROCEEDS label, NOT an instrument. A green bond is a
+-- senior bond that happens to be green; putting these in the instrument
+-- vocabulary would corrupt every "what share is equity" denominator.
+CREATE TABLE IF NOT EXISTS project_themes (
+    project_id  INTEGER NOT NULL,
+    theme       TEXT    NOT NULL,
+    provenance  TEXT    NOT NULL,   -- 'project_name' or 'description'
+    UNIQUE (project_id, theme),
+    FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_project_themes_theme ON project_themes (theme);
+
 CREATE INDEX IF NOT EXISTS idx_project_instruments_instrument
     ON project_instruments (canonical_instrument);
 

@@ -783,3 +783,73 @@ So a cross-DFI *per-project* mobilisation series is not currently possible.
 Adding IFC and EBRD would mean hand-entering annual aggregates from their
 reports, on a different grain from the per-project data, and that has not
 been done rather than quietly mixing the two.
+
+## Table: `project_themes` — thematic bond labels
+
+One row per (project, theme). Set by `derive_thematic_bonds.py` from
+`thematic_bond_rules.csv`.
+
+| Field | Type | Description |
+|---|---|---|
+| `project_id` | INTEGER | FK to `projects.id`, `ON DELETE CASCADE`. |
+| `theme` | TEXT | One of: Green bond, Social bond, Sustainability bond, Sustainability-linked bond, Blue bond, Gender bond. |
+| `provenance` | TEXT | `project_name` (the issuer's own label) or `description` (prose that mentions it). The name is stronger evidence; filter to it for a stricter view. |
+
+### Why this is not an instrument
+
+A green bond is a **senior bond that happens to be green**. The theme is a
+use-of-proceeds label sitting on top of an instrument. Putting these in the
+instrument vocabulary would make one deal both `Senior debt` and `Green bond`
+in the same one-to-many table, and break every "what share is equity"
+denominator. Hence a separate child table.
+
+It is a child table rather than a column because one bond is routinely two
+things: "Banistmo Social Bond with a Gender Focus" is genuinely both, and
+6 deals carry more than one label.
+
+### Why deriving this is safe, when deriving an instrument was not
+
+This project refuses to infer an instrument from a description, because
+structure has to be disclosed to be known. A theme is different in kind: the
+issuer **names** the bond. "Banco Pichincha - Green Bond" is not our reading
+of a green bond, it is what the thing is called. We record a label; we do not
+deduce a structure.
+
+Three guards keep that honest, and each was added because it caught something:
+
+1. **Only literal phrases match** — no stemming, no similarity scoring.
+2. **A phrase only counts on a row that is already a bond**: the text must
+   also say bond, note, sukuk or debenture. Without this, "gender focus"
+   tags equity deals as gender bonds.
+3. **Framework names are stripped before matching** (`exclude_phrase` rows).
+   "Climate Bonds Initiative" is a certifier and "Social Bond Principles" is
+   an ICMA standard — neither says what *this* deal is. The first of these
+   tagged an explicit green **loan** as a green bond. Note that `climate
+   bond` was removed as a theme phrase entirely: it had exactly one match in
+   the whole database, and it was that false positive.
+
+### What is there
+
+217 deals across all ten institutions, ~$10.9bn:
+
+| Theme | From name | From description | Total |
+|---|---|---|---|
+| Green bond | 109 | 10 | 119 |
+| Sustainability bond | 24 | 11 | 35 |
+| Social bond | 19 | 13 | 32 |
+| Sustainability-linked bond | 13 | 5 | 18 |
+| Blue bond | 11 | 1 | 12 |
+| Gender bond | 8 | 0 | 8 |
+
+**A sustainability bond and a sustainability-LINKED bond are different
+things** and never collapse: the first is use-of-proceeds, the second is a
+performance structure whose coupon steps if KPIs are missed.
+
+Counts are a **floor** — they depend on the issuer using a recognised phrase.
+
+### Deliberately out of scope
+
+Thematic **loans**. The data holds 28 "green loan" and 6
+"sustainability-linked loan" mentions. They are a real and fast-growing
+market, but they are a different instrument, and whether they belong in this
+table is a decision nobody has made yet.

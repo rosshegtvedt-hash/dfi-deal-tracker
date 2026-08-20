@@ -17,7 +17,9 @@ project title where none did, so searching it reaches 66% of deals rather
 than 30%. `cp_key` is the normalised form, shipped so the page can group
 "who has been banked by more than one DFI" without redoing the
 normalisation in JavaScript. `cp_derived` is 1 when the name was derived
-rather than disclosed, so the page can mark it.
+rather than disclosed, so the page can mark it. `themes` is a pipe-joined
+list of thematic bond labels (Green bond|Social bond), NULL for the vast
+majority of deals that carry none.
 """
 
 import json
@@ -31,7 +33,7 @@ OUT_PATH = Path(__file__).parent / "web" / "public" / "data.json"
 
 COLUMNS = ["institution", "name", "country", "region", "sector", "instrument",
            "amount_usd", "year", "status", "counterparty", "cp_key",
-           "cp_derived", "url", "dup"]
+           "cp_derived", "themes", "url", "dup"]
 
 
 def main():
@@ -44,6 +46,8 @@ def main():
                   status, counterparty, counterparty_key,
                   CASE WHEN counterparty_provenance = 'derived_from_project_name'
                        THEN 1 ELSE 0 END,
+                  (SELECT GROUP_CONCAT(t.theme, '|') FROM project_themes t
+                    WHERE t.project_id = projects.id),
                   source_url, probable_duplicate_group
            FROM projects"""
     ).fetchall()
