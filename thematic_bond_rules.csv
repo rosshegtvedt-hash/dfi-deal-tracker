@@ -1,25 +1,34 @@
-theme,phrase,notes
-Green bond,green bond,ICMA Green Bond Principles - proceeds to environmental projects
-Green bond,green note,same label on a note rather than a bond
-Green bond,green sukuk,Islamic-finance equivalent
-Social bond,social bond,ICMA Social Bond Principles - proceeds to social outcomes
-Social bond,social note,same label on a note
-Sustainability bond,sustainable bond,"use-of-proceeds bond mixing green and social. NOT the same as a sustainability-LINKED bond"
-Sustainability bond,sustainability bond,variant spelling of the same label
-Sustainability-linked bond,sustainability-linked bond,"coupon steps if KPIs are missed. A PERFORMANCE-linked structure, not use-of-proceeds - deliberately a separate theme"
-Sustainability-linked bond,sustainability linked bond,unhyphenated variant
-Sustainability-linked bond,sustainability-linked note,same structure on a note
-Blue bond,blue bond,proceeds to ocean and water projects
-Blue bond,blue note,same label on a note
-Gender bond,gender bond,proceeds to women-led or women-serving businesses
-Gender bond,social gender bond,"issuers combine the two labels; the row gets BOTH themes, since it is both"
-Gender bond,gender focus,"as in 'Social Bond with a Gender Focus'. Only counted on rows that are already bonds - see the bond test in derive_thematic_bonds.py"
-Gender bond,gender lens,"as in 'Social Bond with a Gender Lens'"
-Gender bond,gender and inclusion,"as in 'Social Bond of Gender and Inclusion'"
-Gender bond,women entrepreneurs empowerment bond,Fedecredito's own name for its gender bond
-exclude_phrase,climate bonds initiative,"a CERTIFIER's name, not a label on the deal. It tagged an explicit green LOAN as a green bond. 'climate bond' had exactly 1 match in the whole database and it was this one, so the phrase was removed entirely."
-exclude_phrase,green bond principles,ICMA framework name - describes the standard a bond follows, not what this deal is
-exclude_phrase,social bond principles,"ICMA framework name. A sustainability bond is aligned with BOTH the green and social principles by definition, so the phrase is weak evidence of a social bond."
-exclude_phrase,sustainability bond guidelines,ICMA framework name
-exclude_phrase,sustainability-linked bond principles,ICMA framework name
-exclude_phrase,social bond guidelines,ICMA framework name
+theme,phrase,labelled_instrument,name_only,notes
+Green,green bond,bond,,ICMA Green Bond Principles
+Green,green note,bond,,same label on a note - a note is a debt security
+Green,green sukuk,bond,,Islamic-finance equivalent
+Green,green loan,loan,,LMA Green Loan Principles - the loan-market equivalent
+Social,social bond,bond,,ICMA Social Bond Principles
+Social,social note,bond,,same label on a note
+Social,social loan,loan,,LMA Social Loan Principles
+Sustainability,sustainable bond,bond,,"use-of-proceeds, mixing green and social. NOT sustainability-LINKED"
+Sustainability,sustainability bond,bond,,variant spelling of the same label
+Sustainability,sustainable loan,loan,,loan-market equivalent
+Sustainability,sustainability loan,loan,,variant spelling
+Sustainability-linked,sustainability-linked bond,bond,,"coupon steps if KPIs are missed - a PERFORMANCE structure, not use-of-proceeds"
+Sustainability-linked,sustainability linked bond,bond,,unhyphenated variant
+Sustainability-linked,sustainability-linked note,bond,,same structure on a note
+Sustainability-linked,sustainability-linked loan,loan,,"the SLL market, which is larger than the SLB market"
+Sustainability-linked,sustainability linked loan,loan,,unhyphenated variant
+Blue,blue bond,bond,,proceeds to ocean and water projects
+Blue,blue note,bond,,same label on a note
+Blue,blue loan,loan,,loan-market equivalent
+Gender,gender bond,bond,,proceeds to women-led or women-serving businesses
+Gender,social gender bond,bond,,"issuers combine the labels; the deal gets BOTH themes, since it is both"
+Gender,gender focus,,yes,"as in 'Social Bond with a Gender Focus'. Names no instrument, so the instrument is read from the surrounding text NAME ONLY: in free prose this describes a company's culture ('an organisation with a gender focus at the core of its business'), not a labelled instrument."
+Gender,gender lens,,yes,"as in 'Social Bond with a Gender Lens' NAME ONLY: in free prose this describes a company's culture ('an organisation with a gender focus at the core of its business'), not a labelled instrument."
+Gender,gender and inclusion,,yes,"as in 'Social Bond of Gender and Inclusion' NAME ONLY: in free prose this describes a company's culture ('an organisation with a gender focus at the core of its business'), not a labelled instrument."
+Gender,women entrepreneurs empowerment bond,bond,,Fedecredito's own name for its gender bond
+exclude_phrase,climate bonds initiative,,,"a CERTIFIER's name, not a label on the deal. It tagged an explicit green LOAN as a green bond. 'climate bond' was dropped as a phrase entirely: 1 match in the whole database, and it was that false positive."
+exclude_phrase,green bond principles,,,ICMA framework name - the standard a bond follows
+exclude_phrase,social bond principles,,,"ICMA framework name. A sustainability bond is aligned with BOTH principles by definition, so it is weak evidence of a social bond."
+exclude_phrase,sustainability bond guidelines,,,ICMA framework name
+exclude_phrase,sustainability-linked bond principles,,,ICMA framework name
+exclude_phrase,social bond guidelines,,,ICMA framework name
+exclude_phrase,green loan principles,,,LMA framework name
+exclude_phrase,sustainability-linked loan principles,,,LMA framework name

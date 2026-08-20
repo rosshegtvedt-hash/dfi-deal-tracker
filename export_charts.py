@@ -396,6 +396,148 @@ def chart_cofinancing(rows, as_of):
               "deals disclosed\nunder different names and can over-group similar ones."))
 
 
+# Themes are their own categorical dimension, so they reuse the same six
+# validated hues. No chart shows themes and institutions in colour on the same
+# canvas, so a hue never means two things at once, and each legend says which
+# dimension it is naming.
+THEME_ORDER = ["Green", "Sustainability", "Social", "Sustainability-linked",
+               "Blue", "Gender"]
+THEME_COLORS = {
+    "Green": "#008300",
+    "Sustainability": "#1baf7a",
+    "Social": "#2a78d6",
+    "Sustainability-linked": "#4a3aa7",
+    "Blue": "#eda100",
+    "Gender": "#e34948",
+}
+
+
+def chart_thematic(as_of):
+    """Who issues labelled debt, and in which flavour.
+
+    A COMPOSITION chart rather than a time series, and that is the point.
+    The year-by-year count swings hard — 27, 12, 33 across 2022–2024 — but the
+    swing is almost entirely one institution: EBRD booked ten green bonds in
+    2021, seven in 2022, NONE in 2023 and four in 2024. Take EBRD out and the
+    rest is flat noise between two and eight a year. At this sample size a
+    trend line would dress one lender's programme decisions up as a market
+    signal, so the chart shows composition, which is stable, instead.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """SELECT p.institution, t.theme, COUNT(DISTINCT p.id) n
+           FROM projects p JOIN project_themes t ON t.project_id = p.id
+           GROUP BY 1, 2""").fetchall()
+    # Order by LABELS, the same quantity the bar length shows. Ordering by
+    # deals instead put IDB Invest's 77 labels below EBRD's 74, because a deal
+    # carrying two labels is one deal and two segments.
+    order = [r[0] for r in conn.execute(
+        """SELECT p.institution FROM projects p
+           JOIN project_themes t ON t.project_id = p.id
+           GROUP BY p.institution ORDER BY COUNT(*) DESC""")]
+    deals, labels, bonds, loans = conn.execute(
+        """SELECT COUNT(DISTINCT project_id), COUNT(*),
+                  COUNT(DISTINCT CASE WHEN labelled_instrument = 'bond'
+                                      THEN project_id END),
+                  COUNT(DISTINCT CASE WHEN labelled_instrument = 'loan'
+                                      THEN project_id END)
+           FROM project_themes""").fetchone()
+    conn.close()
+
+    counts = {(r["institution"], r["theme"]): r["n"] for r in rows}
+    order = order[::-1]                       # barh draws bottom-up
+
+    fig, ax = brand_frame(
+        "Who issues labelled debt",
+        f"{labels} labels across {deals} deals and ten institutions, by the\n"
+        "label the issuer itself gave each one.",
+        as_of,
+        note=(f"Bars count LABELS, not deals: {labels} labels sit on {deals} deals - a bond can be both social and gender.\n"
+              f"Bonds and loans both count ({bonds} bonds, {loans} loans): a green loan is labelled under the Loan Market\n"
+              "Association's principles exactly as a green bond is under ICMA's. Counts are a floor."),
+        left=0.135)
+
+    left = {i: 0 for i in order}
+    for theme in THEME_ORDER:
+        for i in order:
+            v = counts.get((i, theme), 0)
+            if v:
+                ax.barh(i, v, left=left[i], height=0.62,
+                        color=THEME_COLORS[theme], edgecolor="none", zorder=3)
+                left[i] += v
+    for i in order:
+        if left[i]:
+            ax.text(left[i] + 0.9, i, str(left[i]), va="center", ha="left",
+                    fontsize=13, color=INK_2, zorder=4)
+
+    ax.xaxis.grid(True, color=GRID, linewidth=1)
+    ax.set_axisbelow(True)
+    ax.set_xlabel("labels applied", fontsize=13.5, color=MUTED, labelpad=14)
+    ax.set_xlim(0, max(left.values()) * 1.12)
+    ax.tick_params(axis="y", labelsize=14)
+    handles = [Patch(facecolor=THEME_COLORS[t], label=t) for t in THEME_ORDER]
+    ax.legend(handles=handles, loc="lower right", frameon=False, ncol=2,
+              fontsize=13, labelcolor=INK_2, handlelength=1.1, handleheight=1.1,
+              columnspacing=1.6, borderpad=0.2)
+    return save(fig, "06_thematic_debt.png")
+
+
+def chart_mobilisation(as_of):
+    """Third-party capital raised alongside IDB Invest's own money."""
+    conn = sqlite3.connect(DB_PATH)
+    rows = conn.execute(
+        """SELECT CAST(substr(approval_date, 1, 4) AS INTEGER) y,
+                  SUM(amount_usd) / 1e9     own,
+                  SUM(mobilised_usd) / 1e9  mob
+           FROM projects WHERE mobilised_usd > 0
+             AND approval_date >= '2016-01-01' AND approval_date < '2026-01-01'
+           GROUP BY 1 ORDER BY 1""").fetchall()
+    own_all, mob_all = conn.execute(
+        "SELECT SUM(amount_usd), SUM(mobilised_usd) FROM projects "
+        "WHERE mobilised_usd > 0").fetchone()
+    conn.close()
+
+    years = [r[0] for r in rows]
+    fig, ax = brand_frame(
+        "The money that comes with the money",
+        "Third-party capital raised alongside IDB Invest's own commitments,\n"
+        "US$ billions per year.",
+        as_of,
+        note=("IDB Invest only. It is the one institution of the ten that publishes "
+              "mobilisation per project; IFC and\n"
+              "EBRD report it as programme or annual aggregates, which cannot be "
+              "mixed with deal-level data.\n"
+              "Mobilised capital is never counted as an institution's own "
+              "commitment anywhere in this tracker."))
+
+    width = 0.38
+    for r in rows:
+        ax.bar(r[0] - width / 2, r[1], width=width, color=ACCENT,
+               edgecolor="none", zorder=3)
+        ax.bar(r[0] + width / 2, r[2], width=width, color="#1baf7a",
+               edgecolor="none", zorder=3)
+
+    ax.set_xticks(years)
+    ax.set_xticklabels(years, fontsize=13, color=MUTED)
+    ax.yaxis.grid(True, color=GRID, linewidth=1)
+    ax.set_axisbelow(True)
+    ax.set_ylabel("US$ billions", fontsize=13.5, color=MUTED, labelpad=14)
+    ax.set_ylim(0, max(max(r[1], r[2]) for r in rows) * 1.20)
+    ratio = mob_all / own_all if own_all else 0
+    # Both dollar signs are escaped: a matched PAIR of unescaped "$" in a
+    # matplotlib string is parsed as mathtext, which rendered this headline
+    # as italic run-together maths.
+    ax.text(0.5, 0.98, rf"\${ratio:,.2f} mobilised for every \$1 of its own",
+            transform=ax.transAxes, ha="center", va="top", fontsize=18,
+            color=INK, fontweight="semibold")
+    handles = [Patch(facecolor=ACCENT, label="IDB Invest's own account"),
+               Patch(facecolor="#1baf7a", label="Third-party capital mobilised")]
+    ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=13.5,
+              labelcolor=INK_2, handlelength=1.1, handleheight=1.1, borderpad=0.2)
+    return save(fig, "07_mobilisation.png")
+
+
 def main():
     rows, as_of = load()
     print(f"Rendering charts from {len(rows):,} records (data as of {as_of})")
@@ -404,6 +546,8 @@ def main():
     chart_sectors(rows, as_of)
     chart_ticket_size(rows, as_of)
     chart_cofinancing(rows, as_of)
+    chart_thematic(as_of)
+    chart_mobilisation(as_of)
     print(f"Done — {OUT_DIR}")
 
 

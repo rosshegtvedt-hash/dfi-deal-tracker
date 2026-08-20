@@ -36,10 +36,12 @@ Every tag records whether it came from the project name or the description,
 in project_themes.provenance, because a name is the issuer's own label while
 a description is prose that mentions it.
 
-Out of scope, deliberately: thematic LOANS. There are 28 "green loan" and 6
-"sustainability-linked loan" mentions in the data. They are a real and
-growing market, but they are a different instrument and would need their own
-decision about whether to sit in this table.
+Bonds AND loans. An earlier version covered bonds only, which was arbitrary:
+a green loan carries the same label under the LMA Green Loan Principles that
+a green bond carries under ICMA's. The theme is now instrument-agnostic
+("Green", not "Green bond") and `labelled_instrument` records whether the
+label sat on a bond or a loan - so "green bond issuance" and "all green
+debt" are both answerable, and neither is baked into the vocabulary.
 """
 
 import csv
@@ -55,6 +57,10 @@ RULES_CSV = Path(__file__).parent / "thematic_bond_rules.csv"
 # The row must look like a bond for any theme phrase to count. Deliberately
 # narrow: these are the words issuers use for a debt security.
 BOND_RE = re.compile(r"\b(bonds?|notes?|sukuk|debentures?)\b", re.I)
+# The loan-market equivalents. A theme sits on a bond OR a loan, and one of
+# the two must be present for any theme phrase to count - otherwise "gender
+# focus" tags an equity deal as a gender bond.
+LOAN_RE = re.compile(r"\b(loans?|facility|facilities|credit line)\b", re.I)
 
 
 def read_rules():
@@ -78,24 +84,48 @@ def read_rules():
             if theme == "exclude_phrase":
                 excluded.append(phrase)
             elif theme:
-                rules.setdefault(theme, []).append(phrase)
+                rules.setdefault(theme, []).append((
+                    phrase,
+                    (row.get("labelled_instrument") or "").strip() or None,
+                    (row.get("name_only") or "").strip().lower() == "yes"))
     for theme in rules:
-        rules[theme].sort(key=len, reverse=True)
+        rules[theme].sort(key=lambda r: len(r[0]), reverse=True)
     excluded.sort(key=len, reverse=True)
     return rules, excluded
 
 
-def themes_in(text, rules, excluded):
-    """Themes whose phrase appears in `text`, if `text` is about a bond."""
+def themes_in(text, rules, excluded, is_name):
+    """{(theme, labelled_instrument)} found in `text`, if `text` is about debt.
+
+    The theme is instrument-agnostic - "Green" is the label, and whether it
+    sits on a bond or a loan is recorded alongside it. A phrase that names its
+    own instrument ("green loan") says so; one that does not ("gender focus")
+    takes it from the surrounding text.
+    """
     if not text:
         return set()
     lowered = text.lower()
     for phrase in excluded:               # framework names first, so a theme
         lowered = lowered.replace(phrase, " ")   # cannot be read out of one
-    if not BOND_RE.search(lowered):
-        return set()                      # not a bond: no theme can apply
-    return {theme for theme, phrases in rules.items()
-            if any(p in lowered for p in phrases)}
+
+    is_bond = bool(BOND_RE.search(lowered))
+    is_loan = bool(LOAN_RE.search(lowered))
+    if not (is_bond or is_loan):
+        return set()          # not a debt instrument at all: no theme applies
+
+    found = set()
+    for theme, phrases in rules.items():
+        for phrase, instrument, name_only in phrases:
+            if name_only and not is_name:
+                continue      # too loose for prose - see the CSV notes
+            if phrase in lowered:
+                # A phrase naming its own instrument wins; otherwise read it
+                # from the text, preferring bond when both words appear (a
+                # bond's description routinely mentions the loans it funds).
+                found.add((theme, instrument
+                           or ("bond" if is_bond else "loan")))
+                break
+    return found
 
 
 def derive(conn):
@@ -110,14 +140,19 @@ def derive(conn):
             "SELECT id, project_name, description FROM projects").fetchall():
         # The project name is the issuer's own label and wins; the description
         # is prose that mentions it, and only fills in what the name missed.
-        from_name = themes_in(row["project_name"], rules, excluded)
-        from_desc = themes_in(row["description"], rules, excluded) - from_name
-        for theme, provenance in ([(t, "project_name") for t in from_name]
-                                  + [(t, "description") for t in from_desc]):
+        from_name = themes_in(row["project_name"], rules, excluded, True)
+        named = {t for t, _ in from_name}
+        from_desc = {(t, i) for t, i in themes_in(row["description"], rules, excluded, False)
+                     if t not in named}
+        for (theme, instrument), provenance in (
+                [(ti, "project_name") for ti in from_name]
+                + [(ti, "description") for ti in from_desc]):
             conn.execute(
-                "INSERT OR IGNORE INTO project_themes (project_id, theme, provenance) "
-                "VALUES (?, ?, ?)", (row["id"], theme, provenance))
-            counts[(theme, provenance)] = counts.get((theme, provenance), 0) + 1
+                "INSERT OR IGNORE INTO project_themes "
+                "(project_id, theme, provenance, labelled_instrument) "
+                "VALUES (?, ?, ?, ?)", (row["id"], theme, provenance, instrument))
+            key = (theme, provenance)
+            counts[key] = counts.get(key, 0) + 1
 
     tagged = conn.execute(
         "SELECT COUNT(DISTINCT project_id) FROM project_themes").fetchone()[0]

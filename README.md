@@ -24,7 +24,7 @@ python -m scrapers.proparco # 1i. refresh Proparco (AFD open data, ~monthly)
 python -m scrapers.eib      # 1j. refresh EIB Global (live service)
 python enrich_afdb_instruments.py  # 1k. recover AfDB's instrument from its own IATI feed
 python derive_counterparties.py    # 1l. work out who each deal was WITH
-python derive_thematic_bonds.py    # 1m. tag green / social / blue / gender bonds
+python derive_thematic_bonds.py    # 1m. tag green / social / blue / gender labels
 python harmonize.py         # 2. apply the four mapping CSVs (sector, country, instrument, E&S) + per-deal instrument overrides
 python dedupe.py            # 3. re-flag probable co-financed duplicates
 python verify.py            # 4. sanity-check summary in the terminal
@@ -76,8 +76,9 @@ last pipeline run loaded.
 python export_charts.py
 ```
 
-Writes five LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
-time, top countries, sector mix, average ticket size, and co-financing pairs.
+Writes seven LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
+time, top countries, sector mix, average ticket size, co-financing pairs,
+labelled debt by institution, and mobilisation.
 Every chart is drawn inside one shared frame that stamps the RCFH Advisory
 wordmark and the **source attribution footer** — the footer belongs to the
 frame, not to each chart, so a published chart cannot lose it.
@@ -165,13 +166,13 @@ the loader used as a fallback, putting **$10.08bn of group-level money into
 IDB Invest's totals**. Those 248 records now load with a NULL amount and a
 `group_level_amount` issue. IDB Invest fell from $48.91bn to $38.83bn.
 
-## Thematic bonds (green, social, blue, gender)
+## Thematic debt (green, social, blue, gender)
 
 ```
 python derive_thematic_bonds.py
 ```
 
-Tags **217 deals across all ten institutions** with the label the issuer gave
+Tags **265 deals across all ten institutions** with the label the issuer gave
 them: 119 green, 35 sustainability, 32 social, 18 sustainability-linked, 12
 blue, 8 gender. Six deals carry more than one label, because a "Social Bond
 with a Gender Focus" genuinely is both.
@@ -180,6 +181,14 @@ with a Gender Focus" genuinely is both.
 to be green, so themes live in their own `project_themes` table. Putting them
 in the instrument vocabulary would break every "what share is equity"
 denominator.
+
+**Bonds and loans both count.** Restricting this to bonds was arbitrary: a
+green loan carries its label under the Loan Market Association's principles
+exactly as a green bond does under ICMA's. The theme is therefore
+instrument-agnostic — `Green`, not `Green bond` — and
+`labelled_instrument` records whether the label sat on a bond (217 deals) or
+a loan (50). So "green bond issuance" and "all green debt" are both
+answerable, and neither is baked into the vocabulary.
 
 Deriving this is safe in a way that deriving an *instrument* is not: the
 issuer names the bond. We record a label, we do not deduce a structure. Three

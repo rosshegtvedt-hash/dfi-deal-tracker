@@ -792,7 +792,8 @@ One row per (project, theme). Set by `derive_thematic_bonds.py` from
 | Field | Type | Description |
 |---|---|---|
 | `project_id` | INTEGER | FK to `projects.id`, `ON DELETE CASCADE`. |
-| `theme` | TEXT | One of: Green bond, Social bond, Sustainability bond, Sustainability-linked bond, Blue bond, Gender bond. |
+| `theme` | TEXT | One of: Green, Social, Sustainability, Sustainability-linked, Blue, Gender. Instrument-agnostic on purpose — see below. |
+| `labelled_instrument` | TEXT | `bond` or `loan`: what the labelled instrument was. Lets you ask for "green bond issuance" or "all green debt" without either being baked into the vocabulary. |
 | `provenance` | TEXT | `project_name` (the issuer's own label) or `description` (prose that mentions it). The name is stronger evidence; filter to it for a stricter view. |
 
 ### Why this is not an instrument
@@ -853,3 +854,49 @@ Thematic **loans**. The data holds 28 "green loan" and 6
 "sustainability-linked loan" mentions. They are a real and fast-growing
 market, but they are a different instrument, and whether they belong in this
 table is a decision nobody has made yet.
+
+### Bonds and loans both count (revised 2026-08-20)
+
+The first version of this covered bonds only. That was arbitrary: a green
+loan carries its label under the **Loan Market Association's** Green Loan
+Principles exactly as a green bond carries one under **ICMA's**. Both are
+labelled thematic debt; only the instrument differs.
+
+So the theme is now instrument-agnostic — `Green`, not `Green bond` — and
+`labelled_instrument` records which it sat on. Current split: **217 deals
+labelled on bonds, 50 on loans**, 265 deals and 274 labels in total.
+
+This also fixed an asymmetry that would have been invisible: IFC's "VPBank
+Green Loan", "Nedbank Green Loan" and "BT SNP Blue Loan" are explicitly
+labelled instruments that the bonds-only version silently dropped.
+
+A fourth guard came with them. Three phrases — `gender focus`, `gender lens`,
+`gender and inclusion` — name no instrument of their own, so they are marked
+`name_only` in the rules and match **project names only**. In free prose they
+describe a company rather than a security: BII's Moove Nigeria is "an
+organisation that has a gender focus at the core of its business", which is
+not a gender bond. Broadening the debt test to include loans made those
+phrases reachable in descriptions for the first time, and they immediately
+produced six false positives.
+
+### Why the year-on-year count is not charted as a trend
+
+The count swings hard — 25, 27, 12, 33, 23 distinct operations across
+2021–2025 — and it is tempting to read a story into 2023. Don't. Broken down:
+
+- **EBRD alone** booked 10 green bonds in 2021, 7 in 2022, **none in 2023**,
+  4 in 2024. Remove EBRD and the rest is flat noise between 2 and 8.
+- The dip is **not** a disclosure-timing artefact: it survives deduplication
+  and normalising by total deal count (1.77% → 0.81% → 2.01% of all deals),
+  and a timing lag would have suppressed every theme, whereas sustainability,
+  social and sustainability-linked all held steady through 2023.
+
+So it is real in the data but it is one lender's programme decision, not a
+market signal. `export_charts.py` therefore plots **composition**, which is
+stable, rather than a time series.
+
+**2026 is excluded outright** and that one IS an artefact: EIB Global
+contributes 27 rows carrying only **2 distinct names** — the "Global Green
+Bond Initiative" counted once per loan tranche, because EIB's grain is loan
+parts, not projects. Counting rows there would have shown a 2026 boom that is
+one programme.

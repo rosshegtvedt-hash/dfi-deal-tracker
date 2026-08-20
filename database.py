@@ -100,6 +100,9 @@ CREATE TABLE IF NOT EXISTS project_themes (
     project_id  INTEGER NOT NULL,
     theme       TEXT    NOT NULL,
     provenance  TEXT    NOT NULL,   -- 'project_name' or 'description'
+    labelled_instrument TEXT,       -- 'bond' or 'loan': what the LABELLED
+                                    -- instrument is. The theme itself is
+                                    -- instrument-agnostic.
     UNIQUE (project_id, theme),
     FOREIGN KEY (project_id) REFERENCES projects (id) ON DELETE CASCADE
 );
@@ -135,6 +138,7 @@ MIGRATIONS = [
     ("projects", "counterparty_provenance", "TEXT"),
     ("projects", "mobilised_original", "REAL"),
     ("projects", "mobilised_usd", "REAL"),
+    ("project_themes", "labelled_instrument", "TEXT"),
 ]
 
 
