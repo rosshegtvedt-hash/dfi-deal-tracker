@@ -37,10 +37,10 @@ from database import SCHEMA, MIGRATIONS  # noqa: E402
 URL = "https://example.test/projects/"
 
 MAP_ROWS = [
-    ("AfDB", "421 Standard loan", "Senior debt", ""),
+    ("AfDB", "421 Standard loan", "Debt", ""),
     ("AfDB", "110 Standard grant", "Technical assistance / grant", ""),
     ("AfDB", "912 Securities", "", "too vague to place"),
-    ("IFC", "Loan", "Senior debt", ""),
+    ("IFC", "Loan", "Debt", ""),
 ]
 
 OVERRIDE_ROWS = [
@@ -106,19 +106,21 @@ def main():
     harmonize.INSTRUMENT_CSV = tmp / "instrument_mapping.csv"
     harmonize.INSTRUMENT_OVERRIDE_CSV = tmp / "instrument_overrides.csv"
     write_csv(harmonize.INSTRUMENT_CSV,
-              ["institution", "raw_instrument", "canonical_instrument", "notes"],
-              MAP_ROWS)
+              ["institution", "raw_instrument", "canonical_instrument",
+               "canonical_detail", "notes"],
+              [(i, raw, fam, "", note) for i, raw, fam, note in MAP_ROWS])
     write_csv(harmonize.INSTRUMENT_OVERRIDE_CSV,
-              ["institution", "source_url", "canonical_instrument", "notes"],
-              OVERRIDE_ROWS)
+              ["institution", "source_url", "canonical_instrument",
+               "canonical_detail", "notes"],
+              [(i, u, fam, "", note) for i, u, fam, note in OVERRIDE_ROWS])
 
     conn = build_db()
     written, unmapped, enriched = harmonize.harmonize_instruments(conn)
     harmonize.apply_instrument_overrides(conn)
 
     print("\n1. enrichment fills a project whose source published nothing")
-    check("'421 Standard loan' -> Senior debt",
-          rows_for(conn, 1) == [("Senior debt", "iati_enrichment")],
+    check("'421 Standard loan' -> Debt",
+          rows_for(conn, 1) == [("Debt", "iati_enrichment")],
           f"got {rows_for(conn, 1)}")
     check("'110 Standard grant' -> Technical assistance / grant",
           rows_for(conn, 2) == [("Technical assistance / grant", "iati_enrichment")],
@@ -126,7 +128,7 @@ def main():
 
     print("\n2. enrichment never overwrites what the source published")
     check("IFC kept its own 'Loan', not the enriched grant",
-          rows_for(conn, 5) == [("Senior debt", "source_label")],
+          rows_for(conn, 5) == [("Debt", "source_label")],
           f"got {rows_for(conn, 5)} - enrichment overwrote a real disclosure")
 
     print("\n3. provenance distinguishes the two")

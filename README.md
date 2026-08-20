@@ -278,10 +278,42 @@ sovereign lending, EIB because only ~21% of our loan parts appear in it and
 its feed stops in 2025. Both findings are recorded in `harmonize.py` so the
 question doesn't get reopened from scratch.
 
-The five canonical instrument values are declared once in `harmonize.py`
-(`CANONICAL_INSTRUMENTS`), and both instrument CSVs are checked against it —
-a misspelled value stops the run instead of quietly becoming a sixth
-instrument. Capitalisation is forgiven; unknown values are not.
+### Family and detail — we never assert a seniority nobody stated
+
+Instruments have **two levels**. The **family** is what every source can
+actually support:
+
+> Debt · Equity · Guarantee · Political risk insurance ·
+> Technical assistance / grant
+
+It says **Debt**, not "Senior debt", and that is the whole point. This
+vocabulary used to carry "Senior debt", and IFC's `Loan` and EBRD's `Debt`
+were both mapped to it even though neither source distinguishes senior from
+subordinated. **17,329 rows** asserted a seniority nobody published, and two
+were flatly wrong: IFC's *Ecobank Ghana Tier II Subordinated Debt* and EBRD's
+*Koudia Al Baida - Subordinated loan* were stored as senior, when a Tier II
+instrument is subordinated by definition.
+
+The **detail** is optional and filled only where a source states it —
+`senior`, `subordinated`, `mezzanine`, `bridge`, `receivables_facility`,
+`shareholder_loan` for debt; `common`, `preferred` for equity. It is recovered
+from the project name, because several institutions put the seniority in the
+title while their instrument field says only "Loan":
+
+```
+python harmonize.py    # runs the detail pass as part of the instrument step
+```
+
+**A NULL detail means "not disclosed". It does not mean senior.** Only 2% of
+debt rows carry one, and that is the honest picture rather than a gap — the
+sources simply do not publish it. Editing `instrument_detail_rules.csv`
+changes what is recognised; `exclude` rows there stop non-financial senses
+("senior secondary school", "junior mining fund") being read as tranches.
+
+Both instrument CSVs are checked against the declared vocabulary — a
+misspelled family stops the run, and so does a detail that belongs to another
+family (`preferred` on a debt row). Capitalisation is forgiven; unknown values
+are not.
 
 ## Overriding the instrument on a single deal
 
@@ -311,12 +343,13 @@ python test_instruments.py
 python test_es_categories.py
 python test_instrument_overrides.py
 python test_instrument_enrichment.py
+python test_instrument_detail.py
 python test_counterparties.py
 python test_mobilisation.py
 python test_thematic_bonds.py
 ```
 
-Seven suites, one per mechanism — instruments are one-to-many into a
+Eight suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
 replace rather than add, and enrichment may only fill silence — so a failure
 names the right thing. They prove: combined instruments produce a row each,

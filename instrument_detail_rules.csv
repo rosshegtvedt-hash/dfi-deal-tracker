@@ -1,0 +1,48 @@
+pattern,detail,notes
+senior,senior,"Bare 'senior' as its own word. Safe because of word boundaries and the exclude list: 'SeniorAssist LAC' is a company and does not match (no boundary after 'senior'), while IFC's suffix style ('Pichincha Senior', 'BOP HTB Senior') and EBRD's 'Senior Preferred Loan' do. It is also what makes 'Senior and Subordinated Loan' come out AMBIGUOUS rather than silently subordinated."
+senior loan,senior,"IFC 'SHL Senior Loan'; AfDB 'Djermaya 28 MW Solar PV IPP - Senior Loan'; DFC 'Azura-Edo Power Project- Senior Loan'"
+senior loans,senior,plural variant - IFC 'BOP CRDB TZ-Senior Loans'
+senior debt,senior,
+senior secured,senior,
+senior facility,senior,
+senior note,senior,
+senior notes,senior,
+senior bond,senior,
+senior bonds,senior,
+senior tranche,senior,
+senior term loan,senior,
+super senior,senior,"a super-senior tranche is senior; DFC uses '(Super Senior Tranche)'"
+(senior),senior,"DFC marks tranches with a parenthetical suffix: 'SDG Investment Fund S.A., SICAV-RAIF (Senior)'"
+subordinated,subordinated,"one meaning in finance. Covers 'BBA - Subordinated Debt', '(Subordinated)', 'Subordinated Loan'"
+subordinated loan,subordinated,
+subordinated debt,subordinated,
+subordinated bond,subordinated,
+tier ii,subordinated,"bank Tier 2 regulatory capital is subordinated BY DEFINITION - this is the Ecobank Ghana case"
+tier 2,subordinated,same as tier ii
+junior loan,subordinated,"junior ranks below senior; DFC 'Azura-Edo Power Project- Junior Loan'"
+junior debt,subordinated,
+junior tranche,subordinated,
+(junior),subordinated,DFC parenthetical tranche marker
+mezzanine loan,mezzanine,
+mezzanine debt,mezzanine,
+mezzanine facility,mezzanine,
+mezzanine tranche,mezzanine,
+mezzanine sub-loan,mezzanine,
+shareholder loan,shareholder_loan,
+shareholder's loan,shareholder_loan,
+bridge loan,bridge,
+bridge facility,bridge,
+bridge financing,bridge,
+exclude,senior secondary,"a SCHOOL, not a tranche"
+exclude,senior high,a school
+exclude,senior citizen,"a beneficiary group. 'Banco Popular: Subordinated Silver Bonds to Support Senior Citizens' is SUBORDINATED - without this exclusion it reads as both and is discarded as ambiguous"
+exclude,senior citizens,as above
+exclude,senior care,a care facility
+exclude,senior living,a care facility
+exclude,senior management,corporate governance language
+exclude,junior secondary,a school
+exclude,junior mining,"a small-cap miner. 'South Africa Junior Mining Fund' is not junior debt"
+exclude,mezzanine fund,"the FUND invests in mezzanine; the DFI holds an LP interest in it. 75 of 83 'mezzanine' names are fund vehicles."
+exclude,mezzanine capital,a fund vehicle name
+exclude,mezzanine partners,a fund manager name
+exclude,mezzanine infrastructure,a fund vehicle name

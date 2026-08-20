@@ -72,12 +72,28 @@ CREATE TABLE IF NOT EXISTS quality_issues (
 -- Harmonized instruments, set by harmonize_instruments.py from
 -- instrument_mapping.csv. A CHILD TABLE rather than a column on projects,
 -- because the mapping is one-to-many: EBRD's "Debt + Equity" is evidence for
--- senior debt AND equity, and a single column would silently drop half of
+-- BOTH debt and equity, and a single column would silently drop half of
 -- every combined instrument. projects.instrument keeps the raw source value
 -- and is never modified.
 CREATE TABLE IF NOT EXISTS project_instruments (
     project_id           INTEGER NOT NULL,
+    -- The FAMILY level: Debt, Equity, Guarantee, Political risk insurance,
+    -- Technical assistance / grant. Always assignable from what a source
+    -- publishes. It deliberately says "Debt", not "Senior debt": almost no
+    -- source discloses seniority, and asserting it was a real bug -- IFC's
+    -- "Ecobank Ghana Tier II Subordinated Debt" was stored as senior.
     canonical_instrument TEXT    NOT NULL,
+    -- The DETAIL level, and NULL is the normal case. NULL means "the source
+    -- did not state it", NOT "senior". Never backfill it with a guess.
+    --   debt:   senior, subordinated, mezzanine, shareholder_loan, bridge,
+    --           receivables_facility
+    --   equity: common, preferred
+    instrument_detail    TEXT,
+    -- Where the detail came from, mirroring `provenance` below:
+    --   'source_label'  -- the raw instrument field said it
+    --   'project_name'  -- the project's own title said it
+    --   'iati_enrichment' / 'manual_override'
+    detail_provenance    TEXT,
     -- Where this canonical value came from, so a chart can always tell an
     -- institution's own instrument field from one recovered elsewhere:
     --   'source_label'    -- projects.instrument, the field the loaded source published
@@ -139,6 +155,8 @@ MIGRATIONS = [
     ("projects", "mobilised_original", "REAL"),
     ("projects", "mobilised_usd", "REAL"),
     ("project_themes", "labelled_instrument", "TEXT"),
+    ("project_instruments", "instrument_detail", "TEXT"),
+    ("project_instruments", "detail_provenance", "TEXT"),
 ]
 
 

@@ -45,6 +45,7 @@ Instruments also have a second, narrower input:
 """
 
 import csv
+import re
 import sys
 from pathlib import Path
 
@@ -57,26 +58,64 @@ INSTRUMENT_CSV = Path(__file__).parent / "instrument_mapping.csv"
 INSTRUMENT_OVERRIDE_CSV = Path(__file__).parent / "instrument_overrides.csv"
 ES_CATEGORY_CSV = Path(__file__).parent / "es_category_mapping.csv"
 
-# The whole instrument vocabulary, in one place. Both instrument CSVs are
-# checked against it, so a typo cannot quietly mint a sixth instrument and
-# split every instrument chart in two.
+# The instrument vocabulary, in two levels, declared once. Both instrument
+# CSVs are checked against it, so a typo cannot quietly mint a new value.
 #
-# Adding a value here is a bigger decision than it looks: this vocabulary is
-# shared with the DFI Mandate Match project, whose mandate rules match on
-# these exact strings. Candidates already discussed and NOT adopted are
-# 'Non-senior debt' (only four deals state it in an instrument field, while
-# ~200 announce it in their project name, so the category would look measured
-# while being ~2% populated) and 'Fund participation' (a real gap, ~12 deals,
-# but still a two-project decision). See data_dictionary.md.
+# FAMILY is the level every source can actually support. It says "Debt", not
+# "Senior debt", and that is the point: EBRD's "Debt" and IFC's "Loan" do not
+# distinguish senior from subordinated, and the old vocabulary asserted a
+# seniority the sources never disclosed. Two rows proved the harm - IFC's
+# "Ecobank Ghana Tier II Subordinated Debt" and EBRD's "Koudia Al Baida -
+# Subordinated loan" were both stored as senior debt, and a Tier II
+# instrument is subordinated by definition.
+#
+# Adding a family is a two-project decision: this vocabulary is shared with
+# the DFI Mandate Match project. (That project reads the RAW instrument
+# column and applies its own mapping, so it is decoupled from this change.)
 CANONICAL_INSTRUMENTS = (
-    "Senior debt",
+    "Debt",
     "Equity",
     "Guarantee",
     "Political risk insurance",
     "Technical assistance / grant",
 )
 
+# DETAIL is optional and is populated ONLY where a source states it. A NULL
+# detail means "not disclosed" - it does NOT mean senior. Roughly 97% of rows
+# have no seniority signal anywhere in their text, so NULL is the normal case
+# and backfilling it with a guess would recreate the bug this replaced.
+INSTRUMENT_DETAILS = {
+    "Debt": ("senior", "subordinated", "mezzanine", "shareholder_loan",
+             "bridge", "receivables_facility"),
+    "Equity": ("common", "preferred"),
+}
+
 _CANONICAL_BY_LOWER = {value.lower(): value for value in CANONICAL_INSTRUMENTS}
+_DETAILS_BY_LOWER = {d.lower(): (family, d)
+                     for family, ds in INSTRUMENT_DETAILS.items() for d in ds}
+
+
+def canonical_detail(value, family, where):
+    """Normalise one instrument detail, or stop the run.
+
+    Also checks the detail belongs to the family: "preferred" is an equity
+    detail and "subordinated" a debt one, and crossing them is a mistake
+    worth catching rather than storing.
+    """
+    match = _DETAILS_BY_LOWER.get(value.strip().lower())
+    if match is None:
+        allowed = ", ".join(sorted(_DETAILS_BY_LOWER))
+        raise ValueError(
+            f"{where}: {value!r} is not a known instrument detail. "
+            f"Expected one of: {allowed}. Leave the cell BLANK if the source "
+            "does not state it - blank means 'not disclosed', which is the "
+            "honest and by far the commonest case.")
+    detail_family, detail = match
+    if family and detail_family != family:
+        raise ValueError(
+            f"{where}: detail {detail!r} belongs to family {detail_family!r}, "
+            f"but the row's family is {family!r}.")
+    return detail
 
 
 def canonical_instrument(value: str, where: str) -> str:
@@ -91,12 +130,12 @@ def canonical_instrument(value: str, where: str) -> str:
     normalised = _CANONICAL_BY_LOWER.get(value.strip().lower())
     if normalised is None:
         raise ValueError(
-            f"{where}: {value!r} is not a canonical instrument. Expected one of: "
-            f"{', '.join(CANONICAL_INSTRUMENTS)}. Fix the spelling — or, if the "
-            "vocabulary really is meant to grow, add the value to "
-            "CANONICAL_INSTRUMENTS in harmonize.py and check "
-            "../DFI Mandate Match/mandate_rules.csv, which matches on these "
-            "same strings.")
+            f"{where}: {value!r} is not a canonical instrument FAMILY. Expected "
+            f"one of: {', '.join(CANONICAL_INSTRUMENTS)}. Note that "
+            "'Senior debt' is no longer a family — seniority is a DETAIL, and "
+            "only where a source states it. Fix the spelling, or add the value "
+            "to CANONICAL_INSTRUMENTS in harmonize.py if the vocabulary really "
+            "is meant to grow.")
     return normalised
 
 
@@ -173,10 +212,13 @@ def read_instrument_mapping() -> dict:
                 continue
             mapping.setdefault((institution, raw), [])
             if canonical:
-                value = canonical_instrument(
-                    canonical, f"instrument_mapping.csv, {institution} {raw!r}")
-                if value not in mapping[(institution, raw)]:
-                    mapping[(institution, raw)].append(value)
+                where = f"instrument_mapping.csv, {institution} {raw!r}"
+                family = canonical_instrument(canonical, where)
+                detail_cell = (row.get("canonical_detail") or "").strip()
+                detail = canonical_detail(detail_cell, family, where) if detail_cell else None
+                pair = (family, detail)
+                if pair not in mapping[(institution, raw)]:
+                    mapping[(institution, raw)].append(pair)
     return mapping
 
 
@@ -208,11 +250,126 @@ def read_instrument_overrides() -> dict:
                 continue
             overrides.setdefault((institution, url), [])
             if canonical:
-                value = canonical_instrument(
-                    canonical, f"instrument_overrides.csv, {url}")
-                if value not in overrides[(institution, url)]:
-                    overrides[(institution, url)].append(value)
+                where = f"instrument_overrides.csv, {url}"
+                family = canonical_instrument(canonical, where)
+                detail_cell = (row.get("canonical_detail") or "").strip()
+                detail = canonical_detail(detail_cell, family, where) if detail_cell else None
+                pair = (family, detail)
+                if pair not in overrides[(institution, url)]:
+                    overrides[(institution, url)].append(pair)
     return overrides
+
+
+INSTRUMENT_DETAIL_CSV = Path(__file__).parent / "instrument_detail_rules.csv"
+
+
+def read_instrument_detail_rules():
+    """instrument_detail_rules.csv -> ([(phrase, detail)], [excluded phrase]).
+
+    `exclude` rows are phrases that contain seniority words in a non-financial
+    sense — "senior secondary" is a school, "junior mining" is a small-cap
+    miner, "mezzanine fund" is a vehicle the DFI holds an LP interest in
+    rather than mezzanine debt it extended. They are removed from the name
+    before any detail is looked for.
+    """
+    rules, excluded = [], []
+    with open(INSTRUMENT_DETAIL_CSV, newline="", encoding="utf-8-sig") as f:
+        for row in csv.DictReader(f):
+            pattern = (row["pattern"] or "").strip().lower()
+            detail = (row["detail"] or "").strip().lower()
+            if not pattern:
+                continue
+            if pattern == "exclude":
+                excluded.append(detail)          # the phrase sits in `detail`
+            else:
+                rules.append((pattern, detail))
+    rules.sort(key=lambda r: len(r[0]), reverse=True)      # longest first
+    excluded.sort(key=len, reverse=True)
+    return rules, excluded
+
+
+def _boundary(phrase):
+    """Regex for `phrase` that will not match inside a longer word.
+
+    This matters more than it looks: "Frontier II" contains the substring
+    "tier II", and a plain `in` test would read it as Tier 2 capital. Same for
+    "Lionbridge Loan" against "bridge loan".
+    """
+    return re.compile(r"(?<![A-Za-z])" + re.escape(phrase) + r"(?![A-Za-z])")
+
+
+def details_in_name(name, rules, excluded):
+    """Every distinct detail stated in a project name. Usually none."""
+    if not name:
+        return set()
+    text = name.lower()
+    for phrase in excluded:
+        text = text.replace(phrase, " ")
+    return {detail for phrase, detail in rules if _boundary(phrase).search(text)}
+
+
+def derive_instrument_details(conn):
+    """Fill instrument_detail from seniority stated in the PROJECT NAME.
+
+    Runs after the label mapping and before the overrides, so a hand-reviewed
+    override still wins. Only ever fills a detail that is currently NULL — it
+    never argues with one a source label already stated.
+
+    Three things make this safe enough to do automatically:
+      * only literal phrases from the rules CSV match, with word boundaries;
+      * a name that states TWO different seniorities is ambiguous and is
+        logged rather than resolved ("Senior and Subordinated Loan" is
+        genuinely both, and picking one would be a coin toss);
+      * the detail must belong to the row's family. "Mezzanine" is a debt
+        detail, so a mezzanine FUND that mapped to Equity is skipped
+        automatically rather than mislabelled.
+
+    Returns (filled, ambiguous, family_mismatch).
+    """
+    rules, excluded = read_instrument_detail_rules()
+    for issue in ("ambiguous_instrument_detail", "instrument_detail_family_mismatch"):
+        conn.execute("DELETE FROM quality_issues WHERE issue_type = ?", (issue,))
+
+    filled, ambiguous, mismatch = 0, [], []
+    for row in conn.execute(
+            """SELECT p.id, p.institution, p.project_name, pi.canonical_instrument fam
+               FROM projects p JOIN project_instruments pi ON pi.project_id = p.id
+               WHERE pi.instrument_detail IS NULL
+                 AND p.project_name IS NOT NULL""").fetchall():
+        found = details_in_name(row["project_name"], rules, excluded)
+        if not found:
+            continue
+        if len(found) > 1:
+            ambiguous.append((row["institution"], row["project_name"], sorted(found)))
+            continue
+        detail = found.pop()
+        allowed = INSTRUMENT_DETAILS.get(row["fam"], ())
+        if detail not in allowed:
+            mismatch.append((row["institution"], row["project_name"],
+                             detail, row["fam"]))
+            continue
+        conn.execute(
+            "UPDATE project_instruments SET instrument_detail = ?, "
+            "detail_provenance = 'project_name' "
+            "WHERE project_id = ? AND canonical_instrument = ?",
+            (detail, row["id"], row["fam"]))
+        filled += 1
+
+    for institution, name, found in ambiguous:
+        log_quality_issue(
+            conn, institution, name, "ambiguous_instrument_detail",
+            f"The project name states more than one seniority ({', '.join(found)}), "
+            "so no detail was recorded. Splitting one row across two rankings "
+            "would be a guess; naming it as one of them would be wrong.")
+    for institution, name, detail, family in mismatch:
+        log_quality_issue(
+            conn, institution, name, "instrument_detail_family_mismatch",
+            f"The project name suggests {detail!r}, which is a detail of a "
+            f"different family, while this deal maps to {family!r}. Not applied. "
+            "The usual cause is a fund vehicle whose NAME describes what the "
+            "fund does: a 'Mezzanine Fund' the DFI holds equity in is not "
+            "mezzanine debt the DFI extended.")
+    return filled, ambiguous, mismatch
 
 
 def apply_instrument_overrides(conn):
@@ -249,10 +406,10 @@ def apply_instrument_overrides(conn):
                 "withdrawn at source; this override currently does nothing.")
             continue
         for row in rows:
-            previous = [r[0] for r in conn.execute(
-                "SELECT canonical_instrument FROM project_instruments "
-                "WHERE project_id = ? ORDER BY canonical_instrument",
-                (row["id"],)).fetchall()]
+            previous = [(r[0], r[1]) for r in conn.execute(
+                "SELECT canonical_instrument, instrument_detail "
+                "FROM project_instruments WHERE project_id = ? "
+                "ORDER BY canonical_instrument", (row["id"],)).fetchall()]
             if previous == sorted(values):
                 continue                    # override agrees; nothing to do
             if previous:
@@ -264,11 +421,13 @@ def apply_instrument_overrides(conn):
                     "by instrument_overrides.csv.")
             conn.execute("DELETE FROM project_instruments WHERE project_id = ?",
                          (row["id"],))
-            for value in values:
+            for family, detail in values:
                 conn.execute(
                     "INSERT OR IGNORE INTO project_instruments "
-                    "(project_id, canonical_instrument, provenance) VALUES (?, ?, ?)",
-                    (row["id"], value, "override"))
+                    "(project_id, canonical_instrument, instrument_detail, "
+                    " detail_provenance, provenance) VALUES (?, ?, ?, ?, ?)",
+                    (row["id"], family, detail,
+                     "manual_override" if detail else None, "override"))
             changed += 1
     return changed, replaced, stale
 
@@ -469,11 +628,13 @@ def harmonize_instruments(conn):
             if key not in mapping:
                 unmapped[key] = unmapped.get(key, 0) + 1
                 continue
-            for canonical in mapping[key]:      # empty list -> nothing written
+            for family, detail in mapping[key]:   # empty list -> nothing written
                 conn.execute(
                     "INSERT OR IGNORE INTO project_instruments "
-                    "(project_id, canonical_instrument, provenance) VALUES (?, ?, ?)",
-                    (row["id"], canonical, provenance))
+                    "(project_id, canonical_instrument, instrument_detail, "
+                    " detail_provenance, provenance) VALUES (?, ?, ?, ?, ?)",
+                    (row["id"], family, detail,
+                     provenance if detail else None, provenance))
 
     apply("SELECT id, institution, instrument AS value FROM projects "
           "WHERE instrument IS NOT NULL AND TRIM(instrument) <> ''",
@@ -534,6 +695,7 @@ def main():
 
     countries_mapped, countries_unmapped = harmonize_countries(conn)
     instrument_rows, instruments_unmapped, enriched_rows = harmonize_instruments(conn)
+    detailed, ambiguous, mismatched = derive_instrument_details(conn)
     overridden, replaced, stale_overrides = apply_instrument_overrides(conn)
     instrument_rows = conn.execute(
         "SELECT COUNT(*) FROM project_instruments").fetchone()[0]
@@ -572,6 +734,8 @@ def main():
     if enriched_rows:
         print(f"             {enriched_rows} of those recovered from an "
               "institution's own IATI feed (provenance='iati_enrichment').")
+    print(f"             {detailed} detail(s) recovered from project names "
+          f"({len(ambiguous)} ambiguous, {len(mismatched)} wrong family - both logged).")
     print(f"             {overridden} deal(s) set from instrument_overrides.csv.")
     if replaced:
         print("             OVERRODE a label-mapped value (logged as "

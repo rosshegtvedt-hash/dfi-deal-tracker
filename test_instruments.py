@@ -34,9 +34,9 @@ from database import SCHEMA  # noqa: E402
 
 # --- the throwaway mapping ------------------------------------------------
 MAP_ROWS = [
-    ("EBRD", "Debt + Equity", "Senior debt", "combined - paired row"),
+    ("EBRD", "Debt + Equity", "Debt", "combined - paired row"),
     ("EBRD", "Debt + Equity", "Equity", "combined - paired row"),
-    ("EBRD", "Debt", "Senior debt", ""),
+    ("EBRD", "Debt", "Debt", ""),
     ("IFC", "Risk Management", "", "deliberately unmapped, on purpose"),
 ]
 
@@ -90,8 +90,11 @@ def unmapped_issues(conn):
 def write_map(path, rows):
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["institution", "raw_instrument", "canonical_instrument", "notes"])
-        w.writerows(rows)
+        w.writerow(["institution", "raw_instrument", "canonical_instrument",
+                    "canonical_detail", "notes"])
+        # Fixtures are (institution, raw, family, notes); the blank detail is
+        # inserted here so the rows stay readable. Details get their own suite.
+        w.writerows((i, raw, fam, "", note) for i, raw, fam, note in rows)
 
 
 def main():
@@ -103,11 +106,11 @@ def main():
     written, unmapped, _enriched = harmonize.harmonize_instruments(conn)
 
     print("\n1. a combined instrument produces one row per canonical value")
-    check("'Debt + Equity' yields both senior debt and equity",
-          instruments_of(conn, 1) == ["Equity", "Senior debt"],
+    check("'Debt + Equity' yields both debt and equity",
+          instruments_of(conn, 1) == ["Debt", "Equity"],
           f"got {instruments_of(conn, 1)}")
     check("a simple instrument yields exactly one row",
-          instruments_of(conn, 2) == ["Senior debt"],
+          instruments_of(conn, 2) == ["Debt"],
           f"got {instruments_of(conn, 2)}")
 
     print("\n2. a blank canonical writes nothing and logs nothing")
@@ -138,13 +141,13 @@ def main():
                     if not (r[0] == "EBRD" and r[1] == "Debt + Equity"
                             and r[2] == "Equity")])
     harmonize.harmonize_instruments(conn)
-    check("dropping the paired row leaves only senior debt",
-          instruments_of(conn, 1) == ["Senior debt"],
+    check("dropping the paired row leaves only debt",
+          instruments_of(conn, 1) == ["Debt"],
           f"got {instruments_of(conn, 1)} - stale rows were not cleared")
     write_map(tmp, MAP_ROWS)          # restore for the remaining checks
     harmonize.harmonize_instruments(conn)
     check("restoring the row brings it back",
-          instruments_of(conn, 1) == ["Equity", "Senior debt"],
+          instruments_of(conn, 1) == ["Debt", "Equity"],
           f"got {instruments_of(conn, 1)}")
 
     print("\n6. the raw source value is never modified")

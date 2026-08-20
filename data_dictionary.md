@@ -423,7 +423,9 @@ every combined instrument.
 | Field | Type | Description |
 |---|---|---|
 | `project_id` | INTEGER | FK to `projects.id`, `ON DELETE CASCADE`, so a loader wiping its institution's rows clears these too. |
-| `canonical_instrument` | TEXT | One of the five canonical values below. |
+| `canonical_instrument` | TEXT | The instrument FAMILY: Debt, Equity, Guarantee, Political risk insurance, Technical assistance / grant. Always assignable from what a source publishes. |
+| `instrument_detail` | TEXT | Optional, and NULL is the normal case. senior, subordinated, mezzanine, shareholder_loan, bridge, receivables_facility (debt) or common, preferred (equity). NULL means the source did not state it - it does NOT mean senior. |
+| `detail_provenance` | TEXT | Where the detail came from: source_label, project_name, iati_enrichment or manual_override. NULL wherever instrument_detail is NULL. |
 | `provenance` | TEXT | Where this value came from: `source_label` (the institution's own instrument field), `iati_enrichment` (recovered from another of its publications), or `override` (a hand-reviewed per-deal decision). Filter on it when a chart needs only what institutions published directly. |
 
 Unique on (`project_id`, `canonical_instrument`). To count deals by
@@ -930,3 +932,115 @@ averaging tranches divided one cheque by the number of slices it arrived in:
 EIB Global was understated by 27% ($57.2m per row against $77.8m per
 operation) and EBRD by 17%. On the corrected basis EIB Global has the largest
 average commitment of the ten, not a mid-table one.
+
+## Instrument family and detail — and why "Senior debt" is gone
+
+### The defect this replaced
+
+The canonical vocabulary used to carry **"Senior debt"**, and IFC's `Loan` and
+EBRD's `Debt` were both mapped to it. The notes column was honest that neither
+source distinguishes senior from subordinated — but the stored **value** was
+not, and every downstream reader took it as disclosed fact.
+
+Two rows show the harm:
+
+| Institution | Project name | Raw label | Was stored as |
+|---|---|---|---|
+| IFC | Ecobank Ghana Tier II Subordinated Debt | `Loan` | Senior debt |
+| EBRD | Koudia Al Baida - Subordinated loan | `Debt` | Senior debt |
+
+A Tier II instrument is **subordinated by definition**. Both said
+"Subordinated" in their own project names and were recorded as senior.
+
+The scale of the inference: **17,329 rows** were stored as "Senior debt", and
+essentially all rested on a coarse label — EBRD's `Debt` (6,656), IFC's `Loan`
+(4,558), AfDB's IATI `421 Standard loan` (2,883), IDB Invest's `Loan` (1,300),
+DFC's `Direct Lending` (636), Proparco's `Prêt` (486). None of those labels
+states seniority.
+
+### The rule
+
+**Say "Debt" when we cannot discriminate. Offer granularity when we can. Never
+encode a precision the source does not support.**
+
+### The two levels
+
+**FAMILY** (`canonical_instrument`) — always assignable:
+Debt · Equity · Guarantee · Political risk insurance ·
+Technical assistance / grant
+
+**DETAIL** (`instrument_detail`) — only where a source states it:
+`senior` · `subordinated` · `mezzanine` · `shareholder_loan` · `bridge` ·
+`receivables_facility` (debt), `common` · `preferred` (equity)
+
+A detail must belong to its family. `preferred` is an equity detail and
+`subordinated` a debt one; crossing them stops the run rather than storing a
+nonsense pair. That check also does useful work by accident — a "Mezzanine
+Fund" the DFI holds *equity* in cannot be tagged as mezzanine debt.
+
+### Where details come from
+
+Recovered from the **project name** by `derive_instrument_details()` in
+`harmonize.py`, using `instrument_detail_rules.csv`. Several institutions state
+seniority in the title while their instrument field says only "Loan":
+
+```
+IFC   "SHL Senior Loan"                     DFC   "Azura-Edo Power Project- Senior Loan"
+IFC   "Ecobank Ghana Tier II Subordinated"  AfDB  "... Djermaya Solar PV IPP - Senior Loan"
+EBRD  "Koudia Al Baida - Subordinated loan"
+```
+
+Four guards keep this conservative, and each was added because it caught
+something real in the data:
+
+1. **Word boundaries, not substrings.** "Fron**tier II**" is not Tier II, and
+   "Lion**bridge** Loan" is not a bridge loan. A plain substring test got both
+   wrong.
+2. **Non-financial senses are excluded.** A *senior secondary school* and a
+   *junior mining fund* are not tranches. "Banco Popular: Subordinated Silver
+   Bonds to Support **Senior Citizens**" is subordinated — the exclusion is
+   what stops it reading as both and being discarded as ambiguous.
+3. **Two seniorities in one name is ambiguous, not a coin toss.** IDB Invest's
+   "Senior **and** Subordinated Loan for Climate and SMEs" is genuinely both;
+   it is logged as `ambiguous_instrument_detail` and no detail is set.
+4. **A detail from the wrong family is refused** and logged as
+   `instrument_detail_family_mismatch`. Six rows hit this, including IFC's
+   "BBA - Subordinated Debt", whose instrument field says *Guarantee* — the
+   source disagreeing with itself, which is worth seeing rather than resolving.
+
+A detail the raw label already states is **never overwritten** by the project
+name. Overrides in `instrument_overrides.csv` win over both, and may set
+family, detail, or both.
+
+### Coverage, stated plainly
+
+| | rows | share |
+|---|---|---|
+| Debt rows in total | 17,336 | |
+| ...with a detail | 352 | **2.03%** |
+| of which `senior` | 236 | |
+| `subordinated` | 108 | |
+| `bridge` / `receivables_facility` / `mezzanine` | 8 | |
+
+**97.97% of debt rows carry no detail, and that is the honest answer**, not a
+gap to be filled. Sources overwhelmingly do not publish seniority. Reading a
+NULL here as "senior" would recreate exactly the bug this design removed.
+
+Parsing project **descriptions** as well would add roughly 321 more details
+(→ 3.88% of debt rows), mostly IDB Invest and ADB. That has deliberately not
+been done: the brief was to parse names, and a description is prose *about* a
+deal rather than the deal's own title. It remains available if wanted.
+
+### What the two-level model unlocked immediately
+
+Three decisions that were previously recorded as "deliberately unmapped"
+purely because the single-value vocabulary could not express them:
+
+- **Three subordinated bonds** (Banco de Bogotá Tier II, BNCR, BBVA UR) now
+  map to `Debt` / `subordinated` instead of being dropped.
+- **Three receivables and payment facilities** (AES El Salvador, Movistar
+  Perú, MABE) now map to `Debt` / `receivables_facility`, which names the
+  structure without claiming a rank it does not have.
+- **One mixed-seniority deal** (Financial Inclusion Social Bond) now maps to
+  family `Debt` with a blank detail — it is certainly debt, and the seniority
+  genuinely is not stated for both tranches.

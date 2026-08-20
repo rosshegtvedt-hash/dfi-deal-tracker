@@ -13,7 +13,7 @@ writes the real tracker. Exits non-zero if any check fails.
 
 Checks:
   1. an override fills in a deal whose label mapped to nothing;
-  2. capitalisation is forgiven ("Senior Debt" -> "Senior debt") but an
+  2. capitalisation is forgiven ("Senior Debt" -> "Debt") but an
      unrecognised value STOPS the run rather than minting a sixth instrument;
   3. a blank override is silent — nothing written, nothing logged;
   4. one override can write several canonical values;
@@ -25,6 +25,8 @@ Checks:
   8. the key is NOT projects.id: after a reload hands out different ids, the
      overrides still land on the right deals;
   9. a rerun changes nothing;
+ 5c. an override can set a DETAIL as well as a family, tagged
+     manual_override;
  10. removing a row from the CSV reverts that deal to the label mapping.
 """
 
@@ -41,7 +43,7 @@ from database import SCHEMA  # noqa: E402
 URL = "https://example.test/projects/"
 
 MAP_ROWS = [
-    ("IDB Invest", "Loan", "Senior debt", ""),
+    ("IDB Invest", "Loan", "Debt", ""),
     ("IDB Invest", "Not Specified", "", "declines to state the instrument"),
     # IFC's collision project must map to something OTHER than what the
     # IDB Invest override writes, or a URL-only key would be invisible here.
@@ -49,25 +51,28 @@ MAP_ROWS = [
 ]
 
 OVERRIDE_ROWS = [
-    # institution, source_url, canonical, notes
-    ("IDB Invest", URL + "alpha", "Senior Debt", "wrong case on purpose"),
-    ("IDB Invest", URL + "beta", "", "reviewed, deliberately unmapped"),
-    ("IDB Invest", URL + "gamma", "Equity", "contradicts the label mapping"),
-    ("IDB Invest", URL + "delta", "Senior debt", "one of two"),
-    ("IDB Invest", URL + "delta", "Equity", "two of two"),
-    ("IDB Invest", URL + "eta", "", "reviewed: the label is wrong for this deal"),
-    ("IDB Invest", URL + "zeta", "Equity", "no project carries this URL"),
+    # institution, source_url, family, detail, notes
+    ("IDB Invest", URL + "alpha", "dEbT", "", "wrong case on purpose"),
+    ("IDB Invest", URL + "beta", "", "", "reviewed, deliberately unmapped"),
+    ("IDB Invest", URL + "gamma", "Equity", "", "contradicts the label mapping"),
+    ("IDB Invest", URL + "delta", "Debt", "", "one of two"),
+    ("IDB Invest", URL + "delta", "Equity", "", "two of two"),
+    ("IDB Invest", URL + "eta", "", "", "reviewed: the label is wrong here"),
+    ("IDB Invest", URL + "zeta", "Equity", "", "no project carries this URL"),
+    # An override may set a DETAIL as well as a family.
+    ("IDB Invest", URL + "theta", "Debt", "subordinated", "hand-reviewed Tier II"),
 ]
 
 # (id, institution, instrument, url_suffix)
 PROJECTS = [
-    (1, "IDB Invest", "Not Specified", "alpha"),    # -> Senior debt by override
+    (1, "IDB Invest", "Not Specified", "alpha"),    # -> Debt by override
     (2, "IDB Invest", "Not Specified", "beta"),     # -> blank on an unmapped deal
-    (3, "IDB Invest", "Loan", "gamma"),             # -> Senior debt, overridden to Equity
+    (3, "IDB Invest", "Loan", "gamma"),             # -> Debt, overridden to Equity
     (4, "IDB Invest", "Not Specified", "delta"),    # -> two canonical values
     (5, "IDB Invest", "Loan", "epsilon"),           # -> untouched by any override
     (6, "IFC", "Equity", "alpha"),                  # -> same URL, other institution
     (7, "IDB Invest", "Loan", "eta"),               # -> blank override CLEARS a mapped value
+    (8, "IDB Invest", "Loan", "theta"),             # -> override sets family AND detail
 ]
 
 failures = []
@@ -84,14 +89,17 @@ def check(label, condition, detail=""):
 def write_map(path, rows):
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["institution", "raw_instrument", "canonical_instrument", "notes"])
-        w.writerows(rows)
+        w.writerow(["institution", "raw_instrument", "canonical_instrument",
+                    "canonical_detail", "notes"])
+        w.writerows((i, raw, fam, "", note) for i, raw, fam, note in rows)
 
 
 def write_overrides(path, rows):
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["institution", "source_url", "canonical_instrument", "notes"])
+        w.writerow(["institution", "source_url", "canonical_instrument",
+                    "canonical_detail", "notes"])
+        # Override fixtures ARE 5-tuples: an override may set a detail.
         w.writerows(rows)
 
 
@@ -137,20 +145,21 @@ def main():
     changed, replaced, stale = run(conn)
 
     print("\n1. an override fills a deal the label mapping left empty")
-    check("'Not Specified' + override -> Senior debt",
-          instruments_for(conn, URL + "alpha") == ["Senior debt"],
+    check("'Not Specified' + override -> Debt",
+          instruments_for(conn, URL + "alpha") == ["Debt"],
           f"got {instruments_for(conn, URL + 'alpha')}")
 
     print("\n2. case is forgiven, an unknown value is not")
-    check("'Senior Debt' was normalised to 'Senior debt'",
-          instruments_for(conn, URL + "alpha") == ["Senior debt"])
+    check("'dEbT' was normalised to 'Debt'",
+          instruments_for(conn, URL + "alpha") == ["Debt"])
     write_overrides(harmonize.INSTRUMENT_OVERRIDE_CSV,
-                    OVERRIDE_ROWS + [("IDB Invest", URL + "alpha", "Mezzanine", "")])
+                    OVERRIDE_ROWS + [("IDB Invest", URL + "alpha",
+                                      "Not A Family", "", "")])
     raised = False
     try:
         harmonize.read_instrument_overrides()
     except ValueError as exc:
-        raised = "Mezzanine" in str(exc)
+        raised = "Not A Family" in str(exc)
     check("an unrecognised instrument stops the run", raised,
           "read_instrument_overrides() accepted a value outside the vocabulary")
     write_overrides(harmonize.INSTRUMENT_OVERRIDE_CSV, OVERRIDE_ROWS)
@@ -163,24 +172,35 @@ def main():
           f"replaced: {replaced}")
 
     print("\n4. one override can carry several canonical values")
-    check("'delta' got both Senior debt and Equity",
-          instruments_for(conn, URL + "delta") == ["Equity", "Senior debt"],
+    check("'delta' got both Debt and Equity",
+          instruments_for(conn, URL + "delta") == ["Debt", "Equity"],
           f"got {instruments_for(conn, URL + 'delta')}")
 
     print("\n5. overriding a mapped value replaces it, loudly")
-    check("'gamma' is now Equity, not Senior debt",
+    check("'gamma' is now Equity, not Debt",
           instruments_for(conn, URL + "gamma") == ["Equity"],
           f"got {instruments_for(conn, URL + 'gamma')}")
     check("a BLANK override CLEARS a value the label mapping produced",
           instruments_for(conn, URL + "eta") == [],
-          f"got {instruments_for(conn, URL + 'eta')} - 'Loan' mapped to Senior "
-          "debt and the blank override did not clear it")
-    check("both replacements were reported, and only those two",
-          sorted(u for _, u, _, _ in replaced) == [URL + "eta", URL + "gamma"],
+          f"got {instruments_for(conn, URL + 'eta')} - 'Loan' mapped to Debt "
+          "and the blank override did not clear it")
+    check("every replacement was reported, and only those",
+          sorted(u for _, u, _, _ in replaced) == [URL + "eta", URL + "gamma",
+                                                   URL + "theta"],
           f"replaced: {replaced}")
-    check("and both were logged as 'instrument_overridden'",
-          issues(conn, "instrument_overridden") == 2,
+    check("and all were logged as 'instrument_overridden'",
+          issues(conn, "instrument_overridden") == 3,
           f"logged: {issues(conn, 'instrument_overridden')}")
+
+    print("\n5c. an override can set a DETAIL as well as a family")
+    row = conn.execute(
+        "SELECT pi.canonical_instrument, pi.instrument_detail, "
+        "pi.detail_provenance FROM project_instruments pi "
+        "JOIN projects p ON p.id = pi.project_id WHERE p.source_url = ?",
+        (URL + "theta",)).fetchone()
+    check("a hand-reviewed Tier II deal comes out Debt/subordinated",
+          tuple(row) == ("Debt", "subordinated", "manual_override"),
+          f"got {tuple(row) if row else None}")
 
     print("\n6. an override matching no project is reported")
     check("'zeta' was flagged stale", [u for _, u in stale] == [URL + "zeta"],
@@ -194,7 +214,7 @@ def main():
           f"got {instruments_for(conn, URL + 'alpha', 'IFC')} - the IDB Invest "
           "override reached across institutions")
     check("a deal with no override keeps its label mapping",
-          instruments_for(conn, URL + "epsilon") == ["Senior debt"])
+          instruments_for(conn, URL + "epsilon") == ["Debt"])
 
     print("\n8. the key is the URL, NOT projects.id")
     idb = [p for p in PROJECTS if p[1] == "IDB Invest"]
@@ -223,11 +243,11 @@ def main():
                     [r for r in OVERRIDE_ROWS if not r[1].endswith("gamma")])
     run(conn)
     check("dropping the override reverts the deal to its label mapping",
-          instruments_for(conn, URL + "gamma") == ["Senior debt"],
+          instruments_for(conn, URL + "gamma") == ["Debt"],
           f"got {instruments_for(conn, URL + 'gamma')} - the override did not clear")
     check("and that override is no longer reported as a replacement",
-          issues(conn, "instrument_overridden") == 1,
-          "only the 'eta' override should remain, got "
+          issues(conn, "instrument_overridden") == 2,
+          "only the 'eta' and 'theta' overrides should remain, got "
           f"{issues(conn, 'instrument_overridden')}")
 
     print(f"\ndeals set by override on the first run: {changed}")
