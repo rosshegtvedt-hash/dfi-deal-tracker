@@ -27,6 +27,8 @@ One row per project/transaction disclosed by a development finance institution.
 | `sponsor` | TEXT | Project sponsor / borrower / investee where disclosed. Raw source value; only IFC, Proparco, ADB and IDB Invest publish one. |
 | `counterparty` | TEXT | Who the deal was WITH. Either the disclosed sponsor verbatim, or a client name cleaned out of `project_name`. Set by `derive_counterparties.py`. NULL where no client could be identified without guessing. |
 | `counterparty_key` | TEXT | `counterparty` uppercased, legal form removed, punctuation collapsed. The join key for "who appears in two institutions' books". An exact-match normalisation, NOT a fuzzy score. |
+| `mobilised_original` | REAL | Third-party capital raised alongside this deal, in the deal's currency. **Never part of `amount_original`** — it is other people's money. Today IDB Invest only. A zero means "reported, none"; NULL means not reported. |
+| `mobilised_usd` | REAL | The same in USD, converted at the **deal's own** rate rather than a separately looked-up one, so the pair can never sit on different years. NULL rather than unconverted when there is no rate to reuse. |
 | `counterparty_provenance` | TEXT | `disclosed` (the source named the client) or `derived_from_project_name` (we cleaned it out of the project title). Always check this before quoting a client relationship. |
 | `description` | TEXT | Free-text project description from the source. |
 | `source_url` | TEXT | URL of the disclosure page or file this record was loaded from. |
@@ -722,3 +724,62 @@ Fund II" and "Growth Fund III" are different funds and must not merge.
 Every count in `report_counterparties.py` is therefore a **floor**: 824
 clients banked by two or more DFIs, 183 by three or more, 955 clients with
 three or more deals from one institution.
+
+## Mobilisation, and the B-tranche question
+
+### The question
+
+In an A/B structure a DFI is lender of record while institutional investors
+fund the B tranche. If a source reports the whole facility and we book it as
+the institution's own commitment, every total is inflated by mobilised
+third-party capital — the same class of error as the BII overstatement.
+
+### The answer: no institution's amount field includes it
+
+Checked 2026-08-20 against each source directly:
+
+| | Evidence |
+|---|---|
+| **IDB Invest** | The feed separates them. Cardal-Punta del Tigre B Bond: `iic_financing_amount` USD 14,000,000, `mobilization` USD 55,539,300. We store 14,000,000. |
+| **EBRD** | "EBRD Finance" equals Debt + Equity + Guarantee on **100%** of 9,415 rows, so it is an own-account instrument breakdown, not a syndicated total. Its 128 A/B-loan operations total 0.46% of its book. |
+| **IFC** | Every amount field is named `ifc_investment_for_*`. Syndications are a separate dataset this pipeline does not read. |
+
+`test_mobilisation.py` keeps a known-value regression on the Cardal deal, so
+if a future change ever folds the two together the row becomes 69,539,300 and
+the suite fails.
+
+### What the investigation did find
+
+IDB Invest publishes **two** amounts. `iic_financing_amount` is its own
+account; `project_idb_fin_amount` is IDB **Group** financing, a broader
+concept running **1.8x to 5.3x** the own-account figure where both appear
+(Nuevo Cauca Toll Road: own $16m, group $84m; Porto de Sergipe: $38m vs
+$200m).
+
+The loader used to fall back to the group figure when the own-account one was
+absent, which put **$10.08bn of group-level money into IDB Invest's totals —
+20% of its book**. Those 248 records now load with `amount` NULL and a
+`group_level_amount` issue preserving the group figure, the same treatment
+IFC's umbrella-programme envelopes get. IDB Invest fell from $48.91bn to
+$38.83bn as a result.
+
+### The mobilisation dimension
+
+`mobilised_original` / `mobilised_usd` carry third-party capital raised
+alongside a deal. **510 IDB Invest projects report $28.37bn of mobilisation
+against $14.91bn of its own money on those same deals — $1.90 mobilised per
+$1 committed.**
+
+Availability is the limit, and it is worth stating plainly:
+
+- **IDB Invest** publishes mobilisation per project. Loaded.
+- **IFC** publishes mobilisation only as programme aggregates (MCPP, a
+  cumulative platform total), not per project in any machine-readable
+  dataset found.
+- **EBRD** publishes Annual Mobilised Investment as an annual aggregate
+  (EUR 5.7bn in 2025), not per project.
+
+So a cross-DFI *per-project* mobilisation series is not currently possible.
+Adding IFC and EBRD would mean hand-entering annual aggregates from their
+reports, on a different grain from the per-project data, and that has not
+been done rather than quietly mixing the two.

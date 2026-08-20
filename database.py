@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS projects (
     counterparty    TEXT,               -- the client/investee/borrower, for BD analysis
     counterparty_key TEXT,              -- normalised form of counterparty, for matching across institutions
     counterparty_provenance TEXT,       -- 'disclosed' (the source named it) or 'derived_from_project_name'
+    mobilised_original REAL,            -- third-party capital raised alongside this deal,
+    mobilised_usd      REAL,            -- in the deal's currency and in USD. NOT part of
+                                        -- amount_usd: it is other people's money.
     description     TEXT,
     source_url      TEXT NOT NULL,      -- where this record came from
     scraped_at      TEXT NOT NULL,      -- ISO timestamp of the load run
@@ -112,6 +115,8 @@ MIGRATIONS = [
     ("projects", "counterparty", "TEXT"),
     ("projects", "counterparty_key", "TEXT"),
     ("projects", "counterparty_provenance", "TEXT"),
+    ("projects", "mobilised_original", "REAL"),
+    ("projects", "mobilised_usd", "REAL"),
 ]
 
 

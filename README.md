@@ -112,7 +112,7 @@ Every other source was checked for a client field first, and **none has one**
 - `derived_from_project_name` — cleaned from the project name, using the rules
   in `counterparty_rules.csv`.
 
-Coverage went from **30% to 66%** (23,085 of 34,637 deals).
+Coverage went from **30% to 66%** (23,051 of 34,641 deals).
 
 Two things this deliberately will not do:
 
@@ -137,9 +137,32 @@ real clients — OTP Bank, TBC Bank, NLB, Development Bank of Ghana. An
 automatic "strip any leading acronym" rule would have deleted them, so the
 list exists to stop anyone re-deriving that rule from the data.
 
-What it finds today: **824 clients banked by two or more DFIs**, 183 by three
-or more, and 955 clients with three or more deals from a single institution.
-Vietnam Prosperity Bank has raised from six.
+What it finds today: **~820 clients banked by two or more DFIs**, ~180 by
+three or more, and ~950 clients with three or more deals from one
+institution. Vietnam Prosperity Bank has raised from six.
+
+## Mobilisation and the B-tranche question
+
+In an A/B structure the DFI is lender of record while institutional investors
+fund the B tranche. If a source reported the whole facility and we booked it
+as the institution's own, every total would be inflated. **Checked against
+every source: none of them do.** IDB Invest reports mobilisation in a separate
+field, EBRD's "EBRD Finance" equals its own Debt + Equity + Guarantee on 100%
+of rows, and IFC's fields are all named `ifc_investment_for_*`.
+
+`mobilised_original` / `mobilised_usd` now carry that third-party capital,
+**never added to `amount_usd`**. 510 IDB Invest projects report **$28.37bn
+mobilised against $14.91bn of their own — $1.90 per $1 committed.**
+
+Only IDB Invest publishes this per project. IFC and EBRD publish annual or
+programme aggregates only, so a cross-DFI per-project series is not currently
+possible and the aggregates have deliberately not been mixed in.
+
+The same investigation found a real overstatement of a different kind:
+IDB Invest's feed carries a second, broader "IDB Group financing" amount that
+the loader used as a fallback, putting **$10.08bn of group-level money into
+IDB Invest's totals**. Those 248 records now load with a NULL amount and a
+`group_level_amount` issue. IDB Invest fell from $48.91bn to $38.83bn.
 
 ## Reviewing the data
 
@@ -240,9 +263,10 @@ python test_es_categories.py
 python test_instrument_overrides.py
 python test_instrument_enrichment.py
 python test_counterparties.py
+python test_mobilisation.py
 ```
 
-Five suites, one per mechanism — instruments are one-to-many into a
+Six suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
 replace rather than add, and enrichment may only fill silence — so a failure
 names the right thing. They prove: combined instruments produce a row each,
