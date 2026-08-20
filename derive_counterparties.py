@@ -90,6 +90,17 @@ SELF_ALIASES = {
     "EIB Global": {"EIB", "EIB GLOBAL", "EUROPEAN INVESTMENT BANK"},
 }
 
+# Words that describe a STATE rather than name a company. Stripping them and
+# re-testing against country_mapping.csv catches sovereign borrowers whose
+# full style is not a country spelling we have on file: "Democratic Republic
+# Of The Sudan" is Sudan, "Islamic Republic of Pakistan" is Pakistan. Without
+# this they survive as clients and, worse, match each other across
+# institutions as if a country were a repeat customer.
+#
+# This only ever REMOVES a name. "Development Bank of Ghana" reduces to
+# "DEVELOPMENT BANK GHANA", which is not a country, so it is kept.
+STATE_WORDS = r"(?<![A-Z])(THE|OF|REPUBLIC|DEMOCRATIC|ISLAMIC|FEDERAL|FEDERATIVE|KINGDOM|STATE|STATES|UNITED|PEOPLES|ARAB|COMMONWEALTH|PLURINATIONAL|BOLIVARIAN|SOCIALIST|GOVERNMENT|MINISTRY|TREASURY)(?![A-Z])"
+
 MIN_LENGTH = 3            # anything shorter identifies nobody
 
 SEPARATORS = "-:–—"     # hyphen, colon, en dash, em dash
@@ -173,6 +184,12 @@ def make_key(name, legal_suffixes):
     return re.sub(r"\s+", " ", key).strip()
 
 
+def sovereign_core(name):
+    """A name with its state-describing words removed, for country testing."""
+    core = re.sub("[^A-Z ]", " ", name.upper())
+    return " ".join(re.sub(STATE_WORDS, " ", core).split())
+
+
 def clean(name, prefixes, suffixes, excludes, countries):
     """Project name -> counterparty, or None if it identifies no company."""
     if not name:
@@ -183,6 +200,8 @@ def clean(name, prefixes, suffixes, excludes, countries):
         return None
     upper = cleaned.upper()
     if upper in excludes or upper in countries:
+        return None
+    if sovereign_core(cleaned) in countries:   # a state, however it is styled
         return None
     if not re.search(r"[A-Za-z]", cleaned):        # digits/punctuation only
         return None
@@ -208,7 +227,18 @@ def derive(conn):
 
         sponsor = (row["sponsor"] or "").strip()
         if sponsor:
-            name, provenance = sponsor, "disclosed"
+            # A disclosed sponsor is used verbatim - no prefix or suffix
+            # stripping, because rewriting what a source stated would be
+            # reinterpreting it. Only the "identifies nobody" list is applied:
+            # "UNKNOWN" is not a name in either mode.
+            #
+            # Note the deliberate asymmetry with derived names. A sovereign the
+            # source NAMES is a real client ("Government of the Province of
+            # Cordoba" borrowed from IFC), so it is kept. A country-looking
+            # name we DERIVED is evidence the name field is recording a place
+            # rather than a client, so it is dropped.
+            name = None if sponsor.upper() in excludes else sponsor
+            provenance = "disclosed"
         elif NAME_IS_COUNTERPARTY.get(institution):
             name = clean(row["project_name"], prefixes, suffixes, excludes, countries)
             provenance = "derived_from_project_name"

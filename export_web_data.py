@@ -10,6 +10,14 @@ list-of-lists rather than list-of-objects to keep the file small (field
 names aren't repeated 20,000 times). Amounts are rounded to whole dollars;
 description and other long fields are deliberately excluded to keep the
 public payload lean.
+
+`counterparty` replaces the raw `sponsor` field: it carries the disclosed
+sponsor verbatim where a source published one, and a name derived from the
+project title where none did, so searching it reaches 66% of deals rather
+than 30%. `cp_key` is the normalised form, shipped so the page can group
+"who has been banked by more than one DFI" without redoing the
+normalisation in JavaScript. `cp_derived` is 1 when the name was derived
+rather than disclosed, so the page can mark it.
 """
 
 import json
@@ -22,7 +30,8 @@ from database import get_connection
 OUT_PATH = Path(__file__).parent / "web" / "public" / "data.json"
 
 COLUMNS = ["institution", "name", "country", "region", "sector", "instrument",
-           "amount_usd", "year", "status", "sponsor", "url", "dup"]
+           "amount_usd", "year", "status", "counterparty", "cp_key",
+           "cp_derived", "url", "dup"]
 
 
 def main():
@@ -32,7 +41,10 @@ def main():
                   canonical_sector, instrument,
                   CAST(ROUND(amount_usd) AS INTEGER),
                   COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER), fiscal_year),
-                  status, sponsor, source_url, probable_duplicate_group
+                  status, counterparty, counterparty_key,
+                  CASE WHEN counterparty_provenance = 'derived_from_project_name'
+                       THEN 1 ELSE 0 END,
+                  source_url, probable_duplicate_group
            FROM projects"""
     ).fetchall()
     as_of = conn.execute("SELECT MAX(scraped_at) FROM projects").fetchone()[0]

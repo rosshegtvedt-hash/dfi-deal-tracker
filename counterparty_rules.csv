@@ -114,3 +114,4 @@ not_a_prefix,ALFI,unverified
 not_a_prefix,LDC,unverified
 not_a_prefix,PPF,unverified
 not_a_prefix,RVF,unverified
+exclude,UNKNOWN,identifies nobody

@@ -54,7 +54,8 @@ def load_data() -> tuple[pd.DataFrame, str]:
                   canonical_country AS country, canonical_region AS region,
                   canonical_sector AS sector, canonical_subsector AS subsector,
                   instrument, amount_usd, approval_date, fiscal_year, status,
-                  es_category, sponsor, source_url, probable_duplicate_group,
+                  es_category, sponsor, counterparty, counterparty_provenance,
+                  source_url, probable_duplicate_group,
                   COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER),
                            fiscal_year) AS year
            FROM projects""",
@@ -237,19 +238,19 @@ with right:
 # ------------------------------------------------------------- deal table --
 st.subheader("Deals")
 search = st.text_input(
-    "Search deals", placeholder="Project name or sponsor…", label_visibility="collapsed")
+    "Search deals", placeholder="Project name or client…", label_visibility="collapsed")
 table = view
 if search:
     needle = search.strip().lower()
     table = table[
         table["project_name"].fillna("").str.lower().str.contains(needle, regex=False)
-        | table["sponsor"].fillna("").str.lower().str.contains(needle, regex=False)]
+        | table["counterparty"].fillna("").str.lower().str.contains(needle, regex=False)]
 
 table = (table.sort_values("approval_date", ascending=False, na_position="last")
               .assign(amount_musd=lambda d: d["amount_usd"] / 1e6))
 st.dataframe(
     table[["institution", "project_name", "country", "sector", "instrument",
-           "amount_musd", "year", "status", "sponsor", "source_url"]],
+           "amount_musd", "year", "status", "counterparty", "source_url"]],
     width="stretch", height=420, hide_index=True,
     column_config={
         "institution": st.column_config.TextColumn("Institution", width="small"),
@@ -260,7 +261,11 @@ st.dataframe(
         "amount_musd": st.column_config.NumberColumn("US$ m", format="%,.1f"),
         "year": st.column_config.NumberColumn("Year", format="%d"),
         "status": st.column_config.TextColumn("Status", width="small"),
-        "sponsor": st.column_config.TextColumn("Sponsor"),
+        "counterparty": st.column_config.TextColumn(
+            "Client",
+            help="Who the deal was with. Where an institution publishes no "
+                 "client field this is derived from the project name; AfDB "
+                 "and EIB Global name projects, not clients, so theirs are blank."),
         "source_url": st.column_config.LinkColumn("Disclosure", display_text="View"),
     },
 )

@@ -120,3 +120,8 @@ td {
 }
 td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
+
+/* Marks a client name we worked out from the project title rather than one
+   the institution published. Deliberately visible: a derived name is a good
+   guess, not a disclosure. */
+.derived { color: var(--muted); margin-left: 3px; cursor: help; }

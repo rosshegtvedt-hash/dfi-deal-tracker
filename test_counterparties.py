@@ -19,7 +19,10 @@ Checks:
   4. programme codes are stripped whether separated by a dash or a space;
   5. a leading acronym that is a real CLIENT is NOT stripped (OTP, TBC, NLB);
   6. trailing product words are stripped;
-  7. a name that is only a country is not a company;
+  7. a name that is only a country is not a company, however long its style,
+     but a bank that merely mentions a country is not a country;
+ 7b. disclosed values skip cleaning but still drop non-names, while a
+     disclosed sovereign is kept - the source named it as its client;
   8. an institution naming itself is not a client relationship;
   9. counterparty_key matches two spellings of one company across institutions;
  10. but does NOT collapse genuinely different fund vintages (II vs III);
@@ -47,11 +50,13 @@ RULES = [
     ("legal_suffix", "S.A.", ""),
     ("legal_suffix", "PLC", ""),
     ("exclude", "VARIOUS", "identifies nobody"),
+    ("exclude", "UNKNOWN", "identifies nobody"),
     ("not_a_prefix", "OTP", "OTP Bank is a real client"),
 ]
 
 COUNTRIES = [("Kenya", "Kenya", "Sub-Saharan Africa"),
-             ("Indonesia", "Indonesia", "East Asia & Pacific")]
+             ("Indonesia", "Indonesia", "East Asia & Pacific"),
+             ("Sudan", "Sudan", "Sub-Saharan Africa")]
 
 # (id, institution, project_name, sponsor)
 PROJECTS = [
@@ -68,6 +73,10 @@ PROJECTS = [
     (11, "EBRD", "Growth Fund II", None),                  # vintage II
     (12, "FMO", "Growth Fund III", None),                  # vintage III - must NOT merge
     (13, "BII", "VARIOUS", None),                          # excluded
+    (14, "DFC", "Democratic Republic Of The Sudan", None),  # a state, styled long
+    (15, "DFC", "Development Bank of Kenya Ltd", None),     # NOT a state
+    (16, "IFC", "Some Project", "UNKNOWN"),                 # disclosed non-name
+    (17, "IFC", "Some Project", "Government of Kenya"),     # disclosed sovereign: KEEP
 ]
 
 failures = []
@@ -162,6 +171,19 @@ def main():
           f"got {cp(conn, 9)[0]!r}")
     check("an excluded label derived nothing", cp(conn, 13)[0] is None,
           f"got {cp(conn, 13)[0]!r}")
+
+    print("\n7b. a state is not a company, however it is styled")
+    check("'Democratic Republic Of The Sudan' derived nothing",
+          cp(conn, 14)[0] is None, f"got {cp(conn, 14)[0]!r}")
+    check("but 'Development Bank of Kenya Ltd' survives",
+          cp(conn, 15)[0] == "Development Bank of Kenya Ltd",
+          f"got {cp(conn, 15)[0]!r} - a real bank was eaten as a country")
+
+    print("\n7c. disclosed values are treated differently, on purpose")
+    check("a disclosed 'UNKNOWN' is dropped", cp(conn, 16)[0] is None,
+          f"got {cp(conn, 16)[0]!r}")
+    check("but a disclosed sovereign is KEPT - the source named it",
+          cp(conn, 17)[0] == "Government of Kenya", f"got {cp(conn, 17)[0]!r}")
 
     print("\n8. an institution naming itself is not a client")
     check("IFC's self-reference was dropped", cp(conn, 10)[0] is None,

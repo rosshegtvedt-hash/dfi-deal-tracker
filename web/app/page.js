@@ -188,7 +188,7 @@ export default function Page() {
       const q = search.trim().toLowerCase();
       rows = rows.filter((r) =>
         (r.name || "").toLowerCase().includes(q) ||
-        (r.sponsor || "").toLowerCase().includes(q));
+        (r.counterparty || "").toLowerCase().includes(q));
     }
     return [...rows].sort((a, b) =>
       (b.year ?? -1) - (a.year ?? -1) || (b.amount_usd ?? -1) - (a.amount_usd ?? -1));
@@ -322,13 +322,13 @@ export default function Page() {
 
       <div className="card">
         <h2>Deals</h2>
-        <input className="search" placeholder="Search project name or sponsor…"
+        <input className="search" placeholder="Search project name or client…"
                value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Institution</th><th>Project</th><th>Country</th><th>Sector</th>
+                <th>Institution</th><th>Project</th><th>Client</th><th>Country</th><th>Sector</th>
                 <th>Instrument</th><th style={{ textAlign: "right" }}>US$ m</th>
                 <th>Year</th><th>Status</th><th></th>
               </tr>
@@ -338,6 +338,12 @@ export default function Page() {
                 <tr key={i}>
                   <td>{r.institution}</td>
                   <td>{r.name}</td>
+                  <td>
+                    {r.counterparty || "—"}
+                    {r.cp_derived ? (
+                      <span className="derived" title="Derived from the project name — the source did not publish a client field">*</span>
+                    ) : null}
+                  </td>
                   <td>{r.country}</td>
                   <td>{r.sector}</td>
                   <td>{r.instrument}</td>
@@ -351,6 +357,11 @@ export default function Page() {
               ))}
             </tbody>
           </table>
+          <p className="sub" style={{ marginTop: 10 }}>
+            Client names marked <span className="derived">*</span> were derived from the project
+            title because the institution publishes no client field. AfDB and EIB Global
+            name projects rather than clients, so their deals show no client at all.
+          </p>
         </div>
         <p className="note">
           Showing {Math.min(TABLE_LIMIT, tableRows.length)} of {tableRows.length.toLocaleString()} deals
