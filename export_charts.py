@@ -561,6 +561,174 @@ def chart_mobilisation(as_of):
     return save(fig, "07_mobilisation.png")
 
 
+# Instrument families reuse the validated hues. No chart shows families and
+# institutions in colour at once, so a hue never means two things on a canvas.
+FAMILY_ORDER = ["Debt", "Guarantee", "Equity",
+                "Political risk insurance", "Technical assistance / grant"]
+FAMILY_COLORS = {
+    "Debt": "#2a78d6",
+    "Guarantee": "#1baf7a",
+    "Equity": "#eda100",
+    "Political risk insurance": "#4a3aa7",
+    "Technical assistance / grant": "#898781",
+}
+
+# Instrument coverage is not uniform, and a missing instrument is not an
+# absence of that instrument. Three institutions publish NO instrument at all.
+# AfDB is excluded for a subtler reason: its only instrument source is its own
+# IATI feed, which carries just three finance-type codes (421 standard loan,
+# 110 standard grant, 912 securities) and NO equity code. Charting AfDB would
+# show 0% equity, which is a limit of what we can see, not a fact about AfDB.
+NO_INSTRUMENT = ("EIB Global", "FMO", "BII")
+INSTRUMENT_BLIND = ("AfDB",)
+
+
+def chart_instrument_mix(as_of):
+    """What SHAPE the capital takes — and deliberately not what rank it holds.
+
+    This chart could not honestly have been drawn until recently. The
+    canonical vocabulary used to carry "Senior debt", and IFC's "Loan" and
+    EBRD's "Debt" were both mapped to it even though neither source
+    distinguishes senior from subordinated — 17,329 rows asserted a seniority
+    nobody published. The vocabulary is now a FAMILY (Debt, Equity,
+    Guarantee, ...) with seniority as an optional DETAIL, filled only where a
+    source states it. It is stated on about 2% of debt rows, which is why
+    seniority appears nowhere on this chart.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    excluded = NO_INSTRUMENT + INSTRUMENT_BLIND
+    placeholders = ",".join("?" * len(excluded))
+    rows = conn.execute(f"""
+        SELECT p.institution inst, pi.canonical_instrument fam,
+               SUM(p.amount_usd) v, COUNT(DISTINCT p.id) n
+        FROM projects p JOIN project_instruments pi ON pi.project_id = p.id
+        WHERE COALESCE(CAST(strftime('%Y', p.approval_date) AS INTEGER),
+                       p.fiscal_year) BETWEEN ? AND ?
+          AND p.amount_usd IS NOT NULL
+          AND p.institution NOT IN ({placeholders})
+        GROUP BY 1, 2""", (RECENT_FROM, RECENT_TO) + excluded).fetchall()
+    conn.close()
+
+    value = {(r["inst"], r["fam"]): (r["v"] or 0) for r in rows}
+    deals = {}
+    for r in rows:
+        deals[r["inst"]] = deals.get(r["inst"], 0) + r["n"]
+    totals = {i: sum(value.get((i, f), 0) for f in FAMILY_ORDER)
+              for i in {r["inst"] for r in rows}}
+    # Ordered by EQUITY share: the question the chart is really asking is who
+    # takes ownership risk rather than lending.
+    order = sorted(totals, key=lambda i: value.get((i, "Equity"), 0) / totals[i])
+
+    fig, ax = brand_frame(
+        "Who actually takes equity risk",
+        "Share of each institution's committed value by instrument family,\n"
+        f"{RECENT_FROM}–{RECENT_TO}. Equity share runs from under 1% to nearly 16%.",
+        as_of,
+        note=("Six institutions. EIB Global, FMO and BII publish no instrument at all; AfDB is excluded because its only source\n"
+              "carries no equity code, so its 0% would be a blind spot, not a finding. IDB Invest publishes none on 23% of\n"
+              "its deals. SENIORITY IS DELIBERATELY NOT SHOWN: sources state it on about 2% of debt, and we no longer infer it."),
+        left=0.135)
+
+    # Draw institution-by-institution so each one's y index is known, then
+    # label every family ONCE, over the bar where it is widest. A legend needs
+    # ~40px between the ticks and the footnote and there are only ~20 spare in
+    # this frame, and a direct label is easier to read than a legend lookup.
+    widest = {}
+    for y, inst in enumerate(order):
+        left = 0.0
+        for fam in FAMILY_ORDER:
+            share = value.get((inst, fam), 0) / totals[inst] * 100
+            if share <= 0:
+                continue
+            ax.barh(y, share, left=left, height=0.62,
+                    color=FAMILY_COLORS[fam], edgecolor="none", zorder=3)
+            if share >= 6:
+                ax.text(left + share / 2, y, f"{share:.0f}%", va="center",
+                        ha="center", fontsize=12.5, color="white",
+                        fontweight="semibold", zorder=4)
+            if share > widest.get(fam, (0,))[0]:
+                widest[fam] = (share, y, left + share / 2)
+            left += share
+        ax.text(101.5, y, f"${totals[inst]/1e9:,.0f}bn", va="center",
+                ha="left", fontsize=12.5, color=INK_2, zorder=4)
+
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels(order, fontsize=14)
+    # A clear row of headroom above the top bar, so the key sits INSIDE the
+    # plot. There are only ~20 spare pixels between the ticks and the footnote
+    # in this frame, and a key above a bar reads as belonging to the bar above.
+    ax.set_ylim(-0.6, len(order) + 0.35)
+    ax.set_xlim(0, 112)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"], fontsize=13, color=MUTED)
+    ax.xaxis.grid(True, color=GRID, linewidth=1)
+    ax.set_axisbelow(True)
+    ax.tick_params(axis="y", labelsize=14)
+    present = [f for f in FAMILY_ORDER if f in widest]
+    handles = [Patch(facecolor=FAMILY_COLORS[f], label=f) for f in present]
+    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.0, 1.0),
+              frameon=False, ncol=len(present), fontsize=12, labelcolor=INK_2,
+              handlelength=1.1, handleheight=1.1, columnspacing=1.5,
+              borderpad=0.0)
+
+
+    return save(fig, "08_instrument_mix.png")
+
+
+def chart_repeat_clients(as_of):
+    """The clients development finance keeps coming back to."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT MIN(counterparty) client, COUNT(DISTINCT institution) dfis,
+               COUNT(*) deals, SUM(COALESCE(amount_usd, 0)) v
+        FROM projects
+        WHERE counterparty_key IS NOT NULL AND counterparty_key <> ''
+        GROUP BY counterparty_key
+        HAVING dfis >= 4
+        ORDER BY v DESC LIMIT 12""").fetchall()
+    shared = conn.execute("""
+        SELECT COUNT(*) FROM (SELECT counterparty_key FROM projects
+          WHERE counterparty_key IS NOT NULL AND counterparty_key <> ''
+          GROUP BY 1 HAVING COUNT(DISTINCT institution) >= 2)""").fetchone()[0]
+    conn.close()
+
+    rows = rows[::-1]                      # barh draws bottom-up
+    # Names exactly as the institutions disclosed them. Title-casing turned
+    # ABSA into "Absa" and NMB into "Nmb"; this project does not rewrite
+    # source values to look tidier.
+    labels = [r["client"] for r in rows]
+    labels = [(l[:28] + "…") if len(l) > 29 else l for l in labels]
+
+    fig, ax = brand_frame(
+        "The clients everybody banks",
+        f"{shared} companies have raised from two or more of these ten\n"
+        "institutions. These twelve are the largest that raised from four or more.",
+        as_of,
+        note=("Names appear as disclosed. Client names are DERIVED where an institution publishes no client field, by cleaning\n"
+              "the project name; AfDB and EIB Global are absent by design, their name fields hold project and asset names.\n"
+              "Matching is exact on a normalised name, never fuzzy - a missed link is safer than an invented one, so this is a FLOOR."),
+        # brand_frame draws its text from x=0.065, so the label strip is
+        # (left - 0.065) of the figure. At 0.235 a 29-character client name
+        # was clipped to "OMMERCIAL BANK OF CEYLON PLC".
+        left=0.325)
+
+    for i, r in enumerate(rows):
+        ax.barh(i, r["v"] / 1e6, height=0.6, color=ACCENT, edgecolor="none",
+                zorder=3)
+        ax.text(r["v"] / 1e6 + 20, i, f"{r['dfis']} DFIs · {r['deals']} deals",
+                va="center", ha="left", fontsize=12.5, color=INK_2, zorder=4)
+    ax.set_yticks(range(len(rows)))
+    ax.set_yticklabels(labels, fontsize=13)
+    ax.set_xlim(0, max(r["v"] for r in rows) / 1e6 * 1.30)
+    ax.xaxis.grid(True, color=GRID, linewidth=1)
+    ax.set_axisbelow(True)
+    ax.set_xlabel("US$ millions committed, all institutions combined",
+                  fontsize=13.5, color=MUTED, labelpad=14)
+    return save(fig, "09_repeat_clients.png")
+
+
 def main():
     rows, as_of = load()
     print(f"Rendering charts from {len(rows):,} records (data as of {as_of})")
@@ -571,6 +739,8 @@ def main():
     chart_cofinancing(rows, as_of)
     chart_thematic(as_of)
     chart_mobilisation(as_of)
+    chart_instrument_mix(as_of)
+    chart_repeat_clients(as_of)
     print(f"Done — {OUT_DIR}")
 
 

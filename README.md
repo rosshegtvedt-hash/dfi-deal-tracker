@@ -76,9 +76,19 @@ last pipeline run loaded.
 python export_charts.py
 ```
 
-Writes seven LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
+Writes nine LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
 time, top countries, sector mix, average ticket size, co-financing pairs,
-labelled debt by institution, and mobilisation.
+labelled debt by institution, mobilisation, instrument mix, and repeat
+clients.
+
+Two of them exclude institutions on purpose, and say so on the canvas. The
+**instrument mix** chart covers six institutions: EIB Global, FMO and BII
+publish no instrument at all, and AfDB is excluded because its only
+instrument source is its own IATI feed, which carries no equity code — its
+0% equity would be a blind spot, not a finding. It shows families only;
+seniority is stated on about 2% of debt rows and is never inferred. The
+**repeat clients** chart has no AfDB or EIB Global because their name fields
+hold project and asset names rather than clients.
 
 Two of them count **operations, not rows**. EIB Global discloses loan
 tranches rather than whole projects and EBRD splits some facilities, so a
