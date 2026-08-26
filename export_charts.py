@@ -1,35 +1,46 @@
 """
-export_charts.py — renders branded PNG charts from the tracker, sized for
-LinkedIn (1200x1200).
+export_charts.py — renders the tracker's exhibits in the RCFH Advisory
+Bathymetric house style.
 
 Run:
     python export_charts.py
 
-Writes into charts/. Every chart is drawn inside one shared frame
-(`brand_frame`) that stamps the RCFH Advisory wordmark, the title/subtitle
-and the **source attribution footer** — the footer is part of the frame
-rather than each chart, so a published chart cannot accidentally lose it.
+Writes into charts/. The apparatus (header band, coverage strip, brass rules,
+notes block, source block) comes from brand/rcfh_chart.py, vendored from the
+rcfh-advisory-brand skill. Nothing here restyles matplotlib by hand.
 
-COLOUR — the categorical palette carries exactly six hues that clear the
-CVD, normal-vision and lightness checks together (validated with the dataviz
-validator at all-pairs). So the six largest institutions by committed USD get
-a fixed hue each and everything else is a neutral "Other". Hues follow the
-institution, never its rank in a given chart, so a chart that drops a series
-never repaints the survivors.
+THREE HOUSE RULES THIS FILE IS BUILT AROUND
+  * Brass never fills. It marks the apparatus and, via emphasise_row, the one
+    row an exhibit argues about.
+  * Colour encodes an ordering, never nothing. Every chart below states which
+    ordering its ramp carries: rank, chronology, or a technical ladder. Where
+    the categories genuinely have no order (the thematic labels), the note
+    says so, so nobody reads depth as magnitude.
+  * Every exhibit carries a notes block. rcfh.save refuses a figure without
+    one, and the coverage strip runs on every exhibit including those drawing
+    on all ten institutions, because a strip that appears only when something
+    is missing trains the reader to ignore it.
 
-COMPARABILITY — institution totals are not like-for-like (different coverage
-windows; EIB Global counts loan tranches; Proparco covers only
-disclosure-consented deals since 2014). Charts therefore default to a recent
-window (RECENT_FROM onward) and every subtitle states the cut being shown.
+TYPE
+Sitka ships on this machine only as a variable font (SitkaVF.ttf), which
+matplotlib reads as a single family "Sitka"; it cannot address the Heading and
+Text optical sizes the house style specifies. Rather than render headings at
+the wrong weight, these exhibits use the declared fallback, Georgia, which
+carries the correct weights and renders identically on any machine. Set
+USE_SITKA_VF = True to prefer the variable font instead.
 
-FMO is filtered to its OWN ACCOUNT everywhere in these charts. FMO's
-disclosure covers both its own book and the Dutch government funds it
-administers (MASSIF, Building Prospects, Access to Energy Fund and others),
-and the two have very different deal sizes — blending them put FMO's average
-cheque at USD 12m against USD 15m for its own lending, and inflated its deal
-count with programme grants. Every other institution here is its own account,
-so filtering FMO makes the comparison honest. The interactive dashboards
-still show all FMO rows, each tagged with its fund.
+COMPARABILITY, unchanged from the previous build
+Institution totals are not like-for-like. EIB Global counts loan tranches,
+Proparco covers only disclosure-consented deals since 2014, and three
+institutions publish no instrument at all. Every exhibit states its own cut.
+FMO is filtered to its OWN ACCOUNT throughout: its disclosure covers both its
+own book and the Dutch government funds it administers, and blending them
+inflates its deal count with programme grants.
+
+Counts and averages use OPERATIONS, not rows. EIB Global discloses loan
+tranches and EBRD splits some facilities, so one deal can arrive as many rows.
+Rows sharing an institution, a name and a date are summed back into one
+operation first.
 """
 
 import sqlite3
@@ -38,710 +49,507 @@ from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.path import Path as MPath  # noqa: E402
-from matplotlib.patches import Patch, PathPatch  # noqa: E402
+import matplotlib.font_manager as fm  # noqa: E402
 
+USE_SITKA_VF = False
+_SITKA_VF = Path("C:/Windows/Fonts/SitkaVF.ttf")
+if USE_SITKA_VF and _SITKA_VF.exists():
+    fm.fontManager.addfont(str(_SITKA_VF))
+
+sys.path.insert(0, str(Path(__file__).parent / "brand"))
 sys.path.insert(0, str(Path(__file__).parent))
+import rcfh_chart as rcfh  # noqa: E402
 from database import DB_PATH  # noqa: E402
 
+if USE_SITKA_VF and _SITKA_VF.exists():
+    rcfh.HEADING = ["Sitka"] + rcfh.HEADING
+    rcfh.BODY = ["Sitka"] + rcfh.BODY
+
 OUT_DIR = Path(__file__).parent / "charts"
-RECENT_FROM = 2015
-# Last year with usable coverage across the panel. 2025 is deliberately
-# excluded: DFC and ADB contribute nothing to it (both load from dated
-# snapshot files), FMO is down 97% and BII 75% on reporting lag, while EBRD,
-# EIB Global, IDB Invest and Proparco all grew. Charting 2025 would show a
-# ~25% "collapse" in development finance that is an artefact of when each
-# source was published, not anything that happened in the market.
-RECENT_TO = 2024
+RECENT_FROM, RECENT_TO = 2015, 2024
 
-# ---------------------------------------------------------------- tokens --
-INK = "#0b0b0b"
-INK_2 = "#52514e"
-MUTED = "#898781"
-GRID = "#e1e0d9"
-SURFACE = "#fcfcfb"
-ACCENT = "#2a78d6"          # single-series magnitude hue
+ALL_TEN = ["IFC", "EBRD", "AfDB", "EIB Global", "IDB Invest",
+           "FMO", "BII", "DFC", "Proparco", "ADB"]
 
-# Six validated categorical hues, one per institution, plus a neutral bucket.
-INSTITUTION_COLORS = {
-    "IFC": "#2a78d6",         # blue
-    "EBRD": "#1baf7a",        # aqua
-    "DFC": "#eda100",         # yellow
-    "IDB Invest": "#008300",  # green
-    "EIB Global": "#4a3aa7",  # violet
-    "AfDB": "#e34948",        # red
-}
-OTHER_SERIES = "Other DFIs"
-OTHER_COLOR = MUTED
-CHART_SERIES = ["IFC", "EBRD", "AfDB", "EIB Global", "IDB Invest", "DFC", OTHER_SERIES]
-
-FOOTER = ("Source: public project disclosures of DFC, IFC, EBRD, IDB Invest, ADB, "
-          "AfDB, BII, FMO, Proparco and EIB Global. FMO is its own account only.\n"
-          "Compiled by RCFH Advisory · DFI Deal Flow Tracker · Data as of {as_of}")
+YEAR = ("COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER), fiscal_year)")
+WINDOW = f"{YEAR} BETWEEN {RECENT_FROM} AND {RECENT_TO}"
 
 # FMO publishes its own book alongside Dutch government funds it merely
-# administers. Only the own-account rows belong in a comparison against
-# institutions that lend off their own balance sheet.
-OWN_ACCOUNT_ONLY = {"FMO"}
-OWN_ACCOUNT_FUND = "FMO"
+# administers. Only own-account rows belong beside institutions that lend off
+# their own balance sheet. The tag sits at the front of the description.
+OWN_ACCOUNT = ("(institution <> 'FMO' OR description LIKE 'Fund: FMO%' "
+               "OR description LIKE 'Funds: FMO%' "
+               "OR description LIKE '%; FMO%' OR description LIKE '%Fund: FMO')")
 
-plt.rcParams["font.family"] = ["Segoe UI", "DejaVu Sans"]
+MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December"]
 
 
-# ------------------------------------------------------------------ data --
-def load():
+def long_date(iso):
+    """2026-08-20 -> 20 August 2026. The house style never uses 8/20/26."""
+    if not iso or len(iso) < 10:
+        return iso or ""
+    y, m, d = iso[:4], int(iso[5:7]), int(iso[8:10])
+    return f"{d} {MONTHS[m - 1]} {y}"
+
+
+def connect():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    return conn
+
+
+def as_of(conn):
+    return long_date((conn.execute(
+        "SELECT MAX(scraped_at) FROM projects").fetchone()[0] or "")[:10])
+
+
+def money(v_bn):
+    return f"USD {v_bn:,.1f}bn" if v_bn < 100 else f"USD {v_bn:,.0f}bn"
+
+
+# ------------------------------------------------------------- exhibit 01 --
+def commitments_over_time(conn, stamp):
+    """Total committed value per year, ramp by CHRONOLOGY.
+
+    A single series rather than the seven-institution stack this replaced.
+    The palette carries five stops and the house rule is that beyond five
+    series a chart is doing too much; the institutional split has its own
+    exhibits. Colouring a year chart by value would scramble chronology, so
+    the ramp runs earliest-shallow to latest-deep.
+    """
     rows = conn.execute(
-        """SELECT institution, project_name, canonical_country AS country,
-                  canonical_sector AS sector, amount_usd, description,
-                  COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER),
-                           fiscal_year) AS year,
-                  probable_duplicate_group AS dup
-           FROM projects"""
-    ).fetchall()
-    as_of = (conn.execute("SELECT MAX(scraped_at) FROM projects").fetchone()[0] or "")[:10]
-    conn.close()
-    return [own_account(dict(r)) for r in rows], as_of
+        f"""SELECT {YEAR} y, SUM(amount_usd) / 1e9 bn FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+            GROUP BY 1 ORDER BY 1""").fetchall()
+    years = [r["y"] for r in rows]
+    values = [r["bn"] for r in rows]
 
-
-def funds_of(row):
-    """Fund names a row is tagged with, from 'Fund: X' / 'Funds: X; Y'."""
-    text = row.get("description") or ""
-    if not text.startswith(("Fund:", "Funds:")):
-        return []
-    return [f.strip() for f in text.split(":", 1)[1].split(";") if f.strip()]
-
-
-def own_account(row):
-    """Mark whether a row is the institution's own lending."""
-    row["is_own_account"] = (
-        row["institution"] not in OWN_ACCOUNT_ONLY
-        or OWN_ACCOUNT_FUND in funds_of(row))
-    return row
-
-
-def recent(rows, lo=RECENT_FROM, hi=RECENT_TO):
-    return [r for r in rows
-            if r["is_own_account"]
-            and r["year"] and lo <= r["year"] <= hi and r["amount_usd"] is not None]
-
-
-def series_for(institution):
-    return institution if institution in INSTITUTION_COLORS else OTHER_SERIES
-
-
-def money(v):
-    if abs(v) >= 1e12:
-        return f"${v/1e12:,.2f}T"
-    if abs(v) >= 1e9:
-        return f"${v/1e9:,.1f}B"
-    return f"${v/1e6:,.0f}M"
-
-
-# ----------------------------------------------------------------- frame --
-def brand_frame(title, subtitle, as_of, note=None, left=0.065):
-    """Shared canvas: wordmark, title, subtitle, chart axes, source footer.
-
-    `left` widens the plot's left margin so long category labels are never
-    clipped — a clipped label is worse than no label.
-    """
-    fig = plt.figure(figsize=(12, 12), dpi=100, facecolor=SURFACE)
-
-    fig.text(0.065, 0.955, "R C F H   A D V I S O R Y", fontsize=13,
-             color=ACCENT, fontweight="bold")
-    fig.text(0.065, 0.915, title, fontsize=31, color=INK, fontweight="semibold",
-             va="top")
-    fig.text(0.065, 0.868, subtitle, fontsize=15.5, color=INK_2, va="top",
-             linespacing=1.5)
-
-    # The note sits above the footer; the footer's top is derived from how many
-    # lines the note actually has, so a longer caveat can never collide with
-    # the source attribution.
-    footer_y = 0.052
-    if note:
-        note_top = 0.100
-        fig.text(0.065, note_top, note, fontsize=12.5, color=MUTED, va="top",
-                 style="italic", linespacing=1.45)
-        footer_y = note_top - note.count("\n") * 0.0175 - 0.028
-    fig.text(0.065, footer_y, FOOTER.format(as_of=as_of), fontsize=12,
-             color=MUTED, va="top", linespacing=1.55)
-
-    ax = fig.add_axes([left, 0.15, 0.95 - left, 0.66])
-    ax.set_facecolor(SURFACE)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.spines["bottom"].set_color(GRID)
-    ax.tick_params(colors=MUTED, labelsize=13.5, length=0)
-    return fig, ax
-
-
-def px_to_xunits(ax, px):
-    """Convert a pixel distance to x-data units — the rounding radius has to be
-    a visual length, and x here is dollars, so it cannot be a data fraction."""
-    inv = ax.transData.inverted()
-    return abs(inv.transform((px, 0))[0] - inv.transform((0, 0))[0])
-
-
-def bar_height_px(ax, height):
-    """Rendered height, in pixels, of a bar `height` y-data units tall."""
-    t = ax.transData
-    return abs(t.transform((0, height))[1] - t.transform((0, 0))[1])
-
-
-def rounded_bar(ax, x0, y, width, height, color, radius=None, horizontal=True):
-    """Bar with a rounded data-end and a square baseline end."""
-    if horizontal:
-        r = min(radius if radius is not None else 0, abs(width))
-        if r <= 0 or width <= 0:
-            return
-        v = [(x0, y - height / 2), (x0 + width - r, y - height / 2),
-             (x0 + width, y - height / 2), (x0 + width, y),
-             (x0 + width, y + height / 2), (x0 + width - r, y + height / 2),
-             (x0, y + height / 2), (x0, y - height / 2)]
-        c = [MPath.MOVETO, MPath.LINETO, MPath.CURVE3, MPath.CURVE3,
-             MPath.CURVE3, MPath.CURVE3, MPath.LINETO, MPath.CLOSEPOLY]
-    else:
-        r = min(radius if radius is not None else 0, abs(height))
-        if r <= 0 or height <= 0:
-            return
-        v = [(x0 - width / 2, y), (x0 - width / 2, y + height - r),
-             (x0 - width / 2, y + height), (x0, y + height),
-             (x0 + width / 2, y + height), (x0 + width / 2, y + height - r),
-             (x0 + width / 2, y), (x0 - width / 2, y)]
-        c = [MPath.MOVETO, MPath.LINETO, MPath.CURVE3, MPath.CURVE3,
-             MPath.CURVE3, MPath.CURVE3, MPath.LINETO, MPath.CLOSEPOLY]
-    ax.add_patch(PathPatch(MPath(v, c), facecolor=color, edgecolor="none",
-                           clip_on=False))
-
-
-def save(fig, name):
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    path = OUT_DIR / name
-    fig.savefig(path, facecolor=SURFACE)
-    plt.close(fig)
-    print(f"  wrote {path.name}")
-    return path
-
-
-LABEL_FONT = 14
-
-
-def hbar_chart(labels, values, title, subtitle, as_of, name, note=None,
-               value_fmt=money, xlabel=None):
-    """Single-series horizontal bars — the magnitude form, one hue."""
-    # Reserve enough left margin for the longest label. Estimated from the
-    # font size (Segoe UI averages ~0.52em per character) and then confirmed
-    # against the rendered text below, so nothing is ever clipped.
-    longest = max((len(str(l)) for l in labels), default=10)
-    left = min(0.42, max(0.09, (longest * LABEL_FONT * 0.52 + 26) / 1200))
-
-    fig, ax = brand_frame(title, subtitle, as_of, note, left=left)
-    y = list(range(len(labels)))
-    span = max(values) if values else 1
-
-    ax.set_yticks(y)
-    ax.set_yticklabels(labels, fontsize=LABEL_FONT, color=INK_2)
-    ax.set_xlim(0, span * 1.16)
-    ax.set_ylim(len(labels) - 0.45, -0.55)
-    ax.xaxis.grid(True, color=GRID, linewidth=1, zorder=0)
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "Development finance commitments have risen by half",
+                dek=f"Disclosed commitments of ten institutions, {RECENT_FROM}"
+                    f"\u2013{RECENT_TO}. The ramp runs in chronological order, "
+                    "earliest shallowest.", exhibit="01")
+    rcfh.coverage(fig, included=ALL_TEN)
+    ax.bar(years, values, color=rcfh.by_sequence(len(years), reverse=True),
+           width=0.68, zorder=3)
+    ax.grid(False)
+    ax.yaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
     ax.set_axisbelow(True)
-    ax.set_xticklabels([])
-    ax.tick_params(axis="x", length=0)
-    if xlabel:
-        ax.set_xlabel(xlabel, fontsize=13, color=MUTED, labelpad=12)
-
-    # Limits are set, so pixel<->data conversion is now meaningful.
-    height = 0.55
-    radius = px_to_xunits(ax, min(7.0, bar_height_px(ax, height) * 0.3))
-    for i, v in zip(y, values):
-        rounded_bar(ax, 0, i, v, height, ACCENT, radius=radius)
-        ax.text(v + span * 0.015, i, value_fmt(v), va="center", ha="left",
-                fontsize=13, color=INK_2)
-
-    # Confirm no y-label overflows the canvas; widen once if one does.
-    fig.canvas.draw()
-    overflow = min((t.get_window_extent().x0 for t in ax.get_yticklabels()),
-                   default=1)
-    if overflow < 4:
-        for a in fig.axes:
-            box = a.get_position()
-            shift = (6 - overflow) / 1200
-            a.set_position([box.x0 + shift, box.y0, box.width - shift, box.height])
-    return save(fig, name)
-
-
-# ---------------------------------------------------------------- charts --
-def chart_over_time(rows, as_of):
-    data = recent(rows)
-    years = list(range(RECENT_FROM, RECENT_TO + 1))
-    totals = {s: {y: 0.0 for y in years} for s in CHART_SERIES}
-    for r in data:
-        totals[series_for(r["institution"])][r["year"]] += r["amount_usd"] / 1e9
-
-    fig, ax = brand_frame(
-        "Development finance commitments, 2015–2024",
-        "Ten institutions' disclosed commitments, in US$ billions per year.",
-        as_of,
-        note=("Coverage differs by institution — EIB Global counts loan tranches and "
-              "Proparco only disclosure-consented deals. Totals are a floor.\n"
-              "2025 is omitted: several sources had not reported it in full, which "
-              "would read as a fall that did not happen."))
-    bottom = {y: 0.0 for y in years}
-    gap = 0.06  # surface gap between stacked segments, in data units
-    for s in CHART_SERIES:
-        color = INSTITUTION_COLORS.get(s, OTHER_COLOR)
-        for y in years:
-            v = totals[s][y]
-            if v <= 0:
-                continue
-            ax.bar(y, v - gap, bottom=bottom[y] + gap / 2, width=0.62,
-                   color=color, edgecolor="none", zorder=3)
-            bottom[y] += v
-
     ax.set_xticks(years)
-    ax.set_xticklabels(years, fontsize=13, color=MUTED)
-    ax.yaxis.grid(True, color=GRID, linewidth=1)
-    ax.set_axisbelow(True)
-    ax.set_ylabel("US$ billions committed", fontsize=13.5, color=MUTED, labelpad=14)
-    peak = max(bottom.values())
-    ax.set_ylim(0, peak * 1.08)
-    # Explicit proxy handles — an empty ax.bar() carries no colour into the
-    # legend, which silently renders every swatch in the default hue.
-    handles = [Patch(facecolor=INSTITUTION_COLORS.get(s, OTHER_COLOR), label=s)
-               for s in CHART_SERIES]
-    ax.legend(handles=handles, loc="upper left", frameon=False, ncol=4,
-              fontsize=13.5, labelcolor=INK_2, handlelength=1.1,
-              handleheight=1.1, columnspacing=1.6, borderpad=0.2)
-    return save(fig, "01_commitments_over_time.png")
+    ax.set_ylabel("USD billions committed")
+    for x, v in zip(years, values):
+        ax.text(x, v + max(values) * 0.02, f"{v:,.0f}", ha="center",
+                va="bottom", color=rcfh.SOUNDING, fontsize=11,
+                fontfamily=rcfh.MONO)
+    rcfh.notes(fig,
+               "Coverage differs by institution and totals are a FLOOR, not a "
+               "market size. EIB Global counts loan tranches rather than whole "
+               "projects; Proparco covers only deals signed since 2014 whose "
+               "clients consented to disclosure; FMO is its own account only. "
+               f"{RECENT_TO + 1} is omitted because several sources had not "
+               "reported it in full, which would read as a fall that did not "
+               "happen.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "01_commitments_over_time.png")
 
 
-def chart_top_countries(rows, as_of):
-    data = recent(rows)
-    agg = {}
-    for r in data:
-        c = r["country"]
-        if not c or c.startswith(("Regional", "Undisclosed", "Unclassified")):
-            continue
-        agg[c] = agg.get(c, 0) + r["amount_usd"]
-    top = sorted(agg.items(), key=lambda kv: -kv[1])[:15]
-    return hbar_chart(
-        [k for k, _ in top], [v for _, v in top],
-        "Where development finance went, 2015–2024",
-        "Top 15 countries by disclosed commitments from ten development finance\n"
-        "institutions. Regional and multi-country operations excluded.",
-        as_of, "02_top_countries.png",
-        note="Country-specific deals only. Institution coverage differs — see the tracker's data notes.")
+# ------------------------------------------------------------- exhibit 02 --
+def top_countries(conn, stamp):
+    """Top 15 recipients, ramp by RANK."""
+    rows = conn.execute(
+        f"""SELECT canonical_country c, SUM(amount_usd) / 1e9 bn FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND canonical_country IS NOT NULL
+              AND canonical_country NOT LIKE 'Regional%'
+              AND canonical_country NOT IN ('Undisclosed', 'Unclassified')
+            GROUP BY 1 ORDER BY bn DESC LIMIT 15""").fetchall()
+    labels = [r["c"] for r in rows][::-1]
+    values = [r["bn"] for r in rows][::-1]
+
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "Where development finance went",
+                dek=f"Top 15 country recipients by disclosed commitment, "
+                    f"{RECENT_FROM}\u2013{RECENT_TO}. The ramp follows the "
+                    "ranking, deepest on the largest.", exhibit="02")
+    rcfh.coverage(fig, included=ALL_TEN)
+    fig.subplots_adjust(left=0.24)
+    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+            height=0.66, zorder=3)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(values) * 1.18)
+    rcfh.value_labels(ax, values, [money(v) for v in values])
+    rcfh.emphasise_row(ax, len(values) - 1)
+    rcfh.notes(fig,
+               "Country-specific deals only: regional and multi-country "
+               "operations are excluded, so this understates every institution "
+               "with a regional window. Countries are harmonised across the ten "
+               "sources, since each publishes its own spellings. Totals are a "
+               "floor for the coverage reasons in the source note.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "02_top_countries.png")
 
 
-def chart_sectors(rows, as_of):
-    data = recent(rows)
-    agg = {}
-    for r in data:
-        s = r["sector"]
-        if not s or s in ("Unclassified", "Undisclosed"):
-            continue
-        agg[s] = agg.get(s, 0) + r["amount_usd"]
-    ranked = sorted(agg.items(), key=lambda kv: -kv[1])
-    total = sum(v for _, v in ranked)
-    share = ranked[0][1] / total * 100
-    return hbar_chart(
-        [k for k, _ in ranked], [v for _, v in ranked],
-        "What development finance actually funds",
-        f"Disclosed commitments by sector, 2015–2024. {ranked[0][0]} alone take "
-        f"{share:.0f} cents\nof every disclosed development finance dollar.",
-        as_of, "03_sector_mix.png")
+# ------------------------------------------------------------- exhibit 03 --
+def sector_mix(conn, stamp):
+    """What development finance funds, ramp by RANK."""
+    rows = conn.execute(
+        f"""SELECT canonical_sector s, SUM(amount_usd) / 1e9 bn FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND canonical_sector IS NOT NULL
+              AND canonical_sector <> 'Unclassified'
+            GROUP BY 1 ORDER BY bn DESC""").fetchall()
+    labels = [r["s"] for r in rows][::-1]
+    values = [r["bn"] for r in rows][::-1]
+
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "What development finance actually funds",
+                dek=f"Disclosed commitments by harmonised sector, "
+                    f"{RECENT_FROM}\u2013{RECENT_TO}. The ramp follows the "
+                    "ranking.", exhibit="03")
+    rcfh.coverage(fig, included=ALL_TEN)
+    fig.subplots_adjust(left=0.30)
+    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+            height=0.66, zorder=3)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(values) * 1.18)
+    rcfh.value_labels(ax, values, [money(v) for v in values])
+    rcfh.emphasise_row(ax, len(values) - 1)
+    rcfh.notes(fig,
+               "Each institution publishes its own sector taxonomy; these are "
+               "harmonised into fourteen canonical sectors by a reviewed mapping "
+               "file, and deals whose source sector is blank are excluded rather "
+               "than assigned. A sector total mixes very different instruments, "
+               "so read it as where money went, not as what it bought.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "03_sector_mix.png")
 
 
-def chart_ticket_size(rows, as_of):
-    """Average cheque size, per OPERATION rather than per row.
+# ------------------------------------------------------------- exhibit 04 --
+def ticket_size(conn, stamp):
+    """Average commitment per OPERATION, ramp by RANK."""
+    rows = conn.execute(
+        f"""SELECT institution i, AVG(v) avg_usd, COUNT(*) n FROM (
+              SELECT institution, lower(project_name) nm, {YEAR} y,
+                     SUM(amount_usd) v
+              FROM projects
+              WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              GROUP BY institution, nm, y)
+            GROUP BY 1 HAVING n >= 20 ORDER BY avg_usd DESC""").fetchall()
+    labels = [r["i"] for r in rows][::-1]
+    values = [r["avg_usd"] / 1e6 for r in rows][::-1]
+    shown = {r["i"] for r in rows}
 
-    EIB Global and EBRD both split a single operation across several
-    disclosed rows - EIB by loan tranche, EBRD for some facilities. Averaging
-    rows therefore divided one cheque by the number of slices it arrived in,
-    understating EIB Global by 27% ($57.2m against $77.8m) and EBRD by 17%.
-    Summing to the operation first is the like-for-like comparison, since
-    IFC, DFC and the others already publish one row per deal.
-    """
-    data = recent(rows)
-    # Sum the slices of one operation back together before averaging.
-    operations = {}
-    for r in data:
-        key = (r["institution"], (r["project_name"] or "").lower(), r["year"])
-        operations[key] = operations.get(key, 0) + r["amount_usd"]
-    per = {}
-    for (institution, _, _), amount in operations.items():
-        per.setdefault(institution, []).append(amount)
-    stats = sorted(((k, sum(v) / len(v)) for k, v in per.items() if len(v) >= 20),
-                   key=lambda kv: -kv[1])
-    return hbar_chart(
-        [k for k, _ in stats], [v for _, v in stats],
-        "Who writes what size cheque",
-        "Average disclosed commitment per operation, 2015-2024. The spread is what\n"
-        "a sponsor is really choosing between when picking a financier.",
-        as_of, "04_ticket_size.png",
-        note=("Rows that share an institution, a name and a year are summed back into one operation first:\n"
-              "EIB Global discloses loan tranches and EBRD splits some facilities, and averaging the slices\n"
-              "understated them. Institutions with fewer than 20 operations in the window are omitted."))
-
-
-def chart_cofinancing(rows, as_of):
-    """Institution pairs that show up in the same probable co-financing group."""
-    groups = {}
-    for r in rows:
-        if r["dup"] and r["is_own_account"]:
-            groups.setdefault(r["dup"], set()).add(r["institution"])
-    pairs = {}
-    for members in groups.values():
-        ms = sorted(members)
-        for i in range(len(ms)):
-            for j in range(i + 1, len(ms)):
-                pairs[(ms[i], ms[j])] = pairs.get((ms[i], ms[j]), 0) + 1
-    top = sorted(pairs.items(), key=lambda kv: -kv[1])[:12]
-    return hbar_chart(
-        [f"{a}  +  {b}" for (a, b), _ in top], [float(n) for _, n in top],
-        "Who co-finances with whom",
-        "Deals appearing in more than one institution's disclosures, matched on\n"
-        "project name, country and year across the full history.",
-        as_of, "05_cofinancing_pairs.png",
-        value_fmt=lambda v: f"{int(v)}",
-        note=("Fuzzy-matched leads, not confirmed syndications — name matching misses "
-              "deals disclosed\nunder different names and can over-group similar ones."))
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "Who writes what size cheque",
+                dek=f"Average commitment per operation, {RECENT_FROM}\u2013"
+                    f"{RECENT_TO}. The spread is what a sponsor chooses between "
+                    "when picking a financier.", exhibit="04")
+    rcfh.coverage(fig, included=[i for i in ALL_TEN if i in shown],
+                  excluded=[i for i in ALL_TEN if i not in shown])
+    fig.subplots_adjust(left=0.24)
+    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+            height=0.66, zorder=3)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(values) * 1.18)
+    rcfh.value_labels(ax, values, [f"USD {v:,.0f}M" for v in values])
+    rcfh.emphasise_row(ax, len(values) - 1)
+    rcfh.notes(fig,
+               "Averages run per OPERATION, not per disclosed row. EIB Global "
+               "publishes loan tranches and EBRD splits some facilities, so rows "
+               "sharing an institution, a name and a year are summed back "
+               "together first; averaging the slices understated EIB Global by "
+               "27% and EBRD by 17%. Institutions with fewer than 20 operations "
+               "in the window are excluded, and an average hides a wide "
+               "distribution in both directions.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "04_ticket_size.png")
 
 
-# Themes are their own categorical dimension, so they reuse the same six
-# validated hues. No chart shows themes and institutions in colour on the same
-# canvas, so a hue never means two things at once, and each legend says which
-# dimension it is naming.
-THEME_ORDER = ["Green", "Sustainability", "Social", "Sustainability-linked",
-               "Blue", "Gender"]
-THEME_COLORS = {
-    "Green": "#008300",
-    "Sustainability": "#1baf7a",
-    "Social": "#2a78d6",
-    "Sustainability-linked": "#4a3aa7",
-    "Blue": "#eda100",
-    "Gender": "#e34948",
-}
+# ------------------------------------------------------------- exhibit 05 --
+def cofinancing_pairs(conn, stamp):
+    """Institution pairs sharing a flagged deal, ramp by RANK."""
+    import collections
+    import itertools
+    groups = collections.defaultdict(set)
+    for r in conn.execute(
+            "SELECT probable_duplicate_group g, institution i FROM projects "
+            "WHERE probable_duplicate_group IS NOT NULL"):
+        groups[r["g"]].add(r["i"])
+    pairs = collections.Counter()
+    for insts in groups.values():
+        for a, b in itertools.combinations(sorted(insts), 2):
+            pairs[(a, b)] += 1
+    top = pairs.most_common(12)[::-1]
+    labels = [f"{a}  +  {b}" for (a, b), _ in top]
+    values = [n for _, n in top]
+
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "Who co-finances with whom",
+                dek="Deals appearing in more than one institution's "
+                    "disclosures, matched on project name, country and year "
+                    "across the full history. The ramp follows the ranking.",
+                exhibit="05")
+    rcfh.coverage(fig, included=ALL_TEN)
+    fig.subplots_adjust(left=0.30)
+    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+            height=0.66, zorder=3)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(values) * 1.18)
+    rcfh.value_labels(ax, values, [f"{v} deals" for v in values])
+    rcfh.emphasise_row(ax, len(values) - 1)
+    rcfh.notes(fig,
+               "These are FUZZY-MATCHED LEADS, not confirmed syndications. "
+               "Name matching misses deals the two institutions disclosed under "
+               "different names, and can over-group similar names in the same "
+               "country and year. Nothing is merged or deleted in the database; "
+               "the groups are flags for review. Treat the counts as a floor on "
+               "co-financing and never as a count of syndications.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "05_cofinancing_pairs.png")
 
 
-def chart_thematic(as_of):
-    """Who issues labelled debt, and in which flavour.
-
-    COUNTS OPERATIONS, NOT ROWS. EIB Global's grain is loan PARTS, so its
-    "Global Green Bond Initiative" arrives as 24 rows sharing one name and one
-    date — counting rows showed EIB with 29 labels when it has 3, and put it
-    fourth on this chart. EBRD splits some operations the same way: "CTP Green
-    Bond" is six rows on a single date.
-
-    The rule is (institution, name, approval date), not name alone. EBRD
-    genuinely returns to the same client — "ONCF Green Bond" was signed in
-    2022 and again in 2025 — and those are two operations, not one. Collapsing
-    on name alone would have under-counted EBRD by three.
-
-    A COMPOSITION chart rather than a time series, and that is deliberate.
-    The year-by-year count swings hard, but the swing is almost entirely one
-    institution: EBRD booked ten green bonds in 2021, seven in 2022, NONE in
-    2023 and four in 2024. Take EBRD out and the rest is flat noise between
-    two and eight a year. At this sample size a trend line would dress one
-    lender's programme decisions up as a market signal.
-    """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    # One row per (operation, theme). The inner DISTINCT is what collapses
-    # tranche-split rows into the operation they belong to.
+# ------------------------------------------------------------- exhibit 06 --
+def thematic_debt(conn, stamp):
+    """Labelled debt by institution. The ramp here carries NO ordering."""
     operations = """
         SELECT DISTINCT p.institution inst, lower(p.project_name) nm,
                COALESCE(p.approval_date, '') dt, t.theme, t.labelled_instrument li
         FROM projects p JOIN project_themes t ON t.project_id = p.id
     """
     rows = conn.execute(
-        f"SELECT inst, theme, COUNT(*) n FROM ({operations}) GROUP BY 1, 2"
-    ).fetchall()
+        f"SELECT inst, theme, COUNT(*) n FROM ({operations}) GROUP BY 1, 2").fetchall()
     order = [r[0] for r in conn.execute(
         f"SELECT inst FROM ({operations}) GROUP BY inst ORDER BY COUNT(*) DESC")]
-    ops, labels, bonds, loans = conn.execute(f"""
+    ops, labels_n, bonds, loans = conn.execute(f"""
         SELECT COUNT(DISTINCT inst || '|' || nm || '|' || dt), COUNT(*),
                SUM(CASE WHEN li = 'bond' THEN 1 ELSE 0 END),
                SUM(CASE WHEN li = 'loan' THEN 1 ELSE 0 END)
         FROM ({operations})""").fetchone()
-    conn.close()
 
+    themes = ["Green", "Sustainability", "Social", "Sustainability-linked",
+              "Blue", "Gender"]
     counts = {(r["inst"], r["theme"]): r["n"] for r in rows}
-    order = order[::-1]                       # barh draws bottom-up
+    order = order[::-1]
+    cols = rcfh.ramp(len(themes), full=True)
 
-    fig, ax = brand_frame(
-        "Who issues labelled debt",
-        f"{labels} labels across {ops} operations and ten institutions, by the\n"
-        "label the issuer itself gave each one.",
-        as_of,
-        note=(f"Bars count LABELS: {labels} on {ops} operations — one bond can be both social and gender. Bonds and loans\n"
-              f"both count ({bonds} and {loans}); repeated tranches of one operation are counted once, which is why EIB\n"
-              "Global shows 3 and not 29. Counts are a floor: they depend on the issuer using a recognised phrase."),
-        left=0.135)
-
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "Who issues labelled debt",
+                dek=f"{labels_n} labels across {ops} operations, by the label "
+                    "the issuer itself gave each one.", exhibit="06")
+    rcfh.legend(fig, themes, cols)
+    rcfh.coverage(fig, included=[i for i in ALL_TEN if i in order],
+                  excluded=[i for i in ALL_TEN if i not in order], y=0.735)
+    fig.subplots_adjust(left=0.24)
     left = {i: 0 for i in order}
-    for theme in THEME_ORDER:
-        for i in order:
-            v = counts.get((i, theme), 0)
+    for ti, theme in enumerate(themes):
+        for y, inst in enumerate(order):
+            v = counts.get((inst, theme), 0)
             if v:
-                ax.barh(i, v, left=left[i], height=0.62,
-                        color=THEME_COLORS[theme], edgecolor="none", zorder=3)
-                left[i] += v
-    for i in order:
-        if left[i]:
-            ax.text(left[i] + 0.9, i, str(left[i]), va="center", ha="left",
-                    fontsize=13, color=INK_2, zorder=4)
+                ax.barh(y, v, left=left[inst], height=0.66, color=cols[ti],
+                        edgecolor=rcfh.GROUND, linewidth=0.8, zorder=3)
+                left[inst] += v
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels(order)
+    ax.set_xlim(0, max(left.values()) * 1.16)
+    rcfh.value_labels(ax, [left[i] for i in order],
+                      [f"{left[i]} labels" for i in order])
+    rcfh.notes(fig,
+               "THE RAMP CARRIES NO ORDERING HERE. Green, social, "
+               "sustainability, sustainability-linked, blue and gender have no "
+               "natural sequence, so the colour assignment is arbitrary and "
+               "depth must not be read as magnitude. Bars count LABELS: one bond "
+               f"can be both social and gender. Bonds and loans both count "
+               f"({bonds} and {loans}); repeated tranches of one operation are "
+               "counted once, which is why EIB Global shows three and not "
+               "twenty-nine. Counts are a floor, since they depend on the issuer "
+               "using a recognised phrase.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "06_thematic_debt.png")
 
-    ax.xaxis.grid(True, color=GRID, linewidth=1)
-    ax.set_axisbelow(True)
-    ax.set_xlabel("labels applied", fontsize=13.5, color=MUTED, labelpad=14)
-    ax.set_xlim(0, max(left.values()) * 1.12)
-    ax.tick_params(axis="y", labelsize=14)
-    handles = [Patch(facecolor=THEME_COLORS[t], label=t) for t in THEME_ORDER]
-    ax.legend(handles=handles, loc="lower right", frameon=False, ncol=2,
-              fontsize=13, labelcolor=INK_2, handlelength=1.1, handleheight=1.1,
-              columnspacing=1.6, borderpad=0.2)
-    return save(fig, "06_thematic_debt.png")
 
-
-def chart_mobilisation(as_of):
-    """Third-party capital raised alongside IDB Invest's own money."""
-    conn = sqlite3.connect(DB_PATH)
+# ------------------------------------------------------------- exhibit 07 --
+def mobilisation(conn, stamp):
+    """IDB Invest's own capital against what it mobilises."""
     rows = conn.execute(
         """SELECT CAST(substr(approval_date, 1, 4) AS INTEGER) y,
-                  SUM(amount_usd) / 1e9     own,
-                  SUM(mobilised_usd) / 1e9  mob
+                  SUM(amount_usd) / 1e9 own, SUM(mobilised_usd) / 1e9 mob
            FROM projects WHERE mobilised_usd > 0
              AND approval_date >= '2016-01-01' AND approval_date < '2026-01-01'
            GROUP BY 1 ORDER BY 1""").fetchall()
     own_all, mob_all = conn.execute(
         "SELECT SUM(amount_usd), SUM(mobilised_usd) FROM projects "
         "WHERE mobilised_usd > 0").fetchone()
-    conn.close()
-
-    years = [r[0] for r in rows]
-    fig, ax = brand_frame(
-        "The money that comes with the money",
-        "Third-party capital raised alongside IDB Invest's own commitments,\n"
-        "US$ billions per year.",
-        as_of,
-        note=("IDB Invest only. It is the one institution of the ten that publishes "
-              "mobilisation per project; IFC and\n"
-              "EBRD report it as programme or annual aggregates, which cannot be "
-              "mixed with deal-level data.\n"
-              "Mobilised capital is never counted as an institution's own "
-              "commitment anywhere in this tracker."))
-
-    width = 0.38
-    for r in rows:
-        ax.bar(r[0] - width / 2, r[1], width=width, color=ACCENT,
-               edgecolor="none", zorder=3)
-        ax.bar(r[0] + width / 2, r[2], width=width, color="#1baf7a",
-               edgecolor="none", zorder=3)
-
-    ax.set_xticks(years)
-    ax.set_xticklabels(years, fontsize=13, color=MUTED)
-    ax.yaxis.grid(True, color=GRID, linewidth=1)
-    ax.set_axisbelow(True)
-    ax.set_ylabel("US$ billions", fontsize=13.5, color=MUTED, labelpad=14)
-    ax.set_ylim(0, max(max(r[1], r[2]) for r in rows) * 1.20)
+    years = [r["y"] for r in rows]
     ratio = mob_all / own_all if own_all else 0
-    # Both dollar signs are escaped: a matched PAIR of unescaped "$" in a
-    # matplotlib string is parsed as mathtext, which rendered this headline
-    # as italic run-together maths.
-    ax.text(0.5, 0.98, rf"\${ratio:,.2f} mobilised for every \$1 of its own",
-            transform=ax.transAxes, ha="center", va="top", fontsize=18,
-            color=INK, fontweight="semibold")
-    handles = [Patch(facecolor=ACCENT, label="IDB Invest's own account"),
-               Patch(facecolor="#1baf7a", label="Third-party capital mobilised")]
-    ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=13.5,
-              labelcolor=INK_2, handlelength=1.1, handleheight=1.1, borderpad=0.2)
-    return save(fig, "07_mobilisation.png")
+
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, f"IDB Invest raises USD {ratio:,.2f} beside every dollar "
+                     "of its own",
+                dek="Own-account commitment and third-party capital mobilised "
+                    "alongside it, USD billions per year.", exhibit="07")
+    rcfh.legend(fig, ["Own account", "Third-party capital mobilised"],
+                [rcfh.TRENCH, rcfh.SHOAL])
+    rcfh.coverage(fig, included=["IDB Invest"],
+                  excluded=[i for i in ALL_TEN if i != "IDB Invest"], y=0.735)
+    w = 0.38
+    ax.bar([y - w / 2 for y in years], [r["own"] for r in rows], width=w,
+           color=rcfh.TRENCH, zorder=3)
+    ax.bar([y + w / 2 for y in years], [r["mob"] for r in rows], width=w,
+           color=rcfh.SHOAL, zorder=3)
+    ax.grid(False)
+    ax.yaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.set_xticks(years)
+    ax.set_ylabel("USD billions")
+    rcfh.notes(fig,
+               "IDB Invest ONLY. It is the one institution of the ten that "
+               "publishes mobilisation per project; IFC reports a cumulative "
+               "programme total and EBRD an annual aggregate, and neither can be "
+               "mixed with deal-level data. Mobilised capital is never counted as "
+               "an institution's own commitment anywhere in this tracker. The "
+               "headline ratio is the all-time aggregate; single years run higher, "
+               "because 2020 carried an unusually large own-account book.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "07_mobilisation.png")
 
 
-# Instrument families reuse the validated hues. No chart shows families and
-# institutions in colour at once, so a hue never means two things on a canvas.
-FAMILY_ORDER = ["Debt", "Guarantee", "Equity",
-                "Political risk insurance", "Technical assistance / grant"]
-FAMILY_COLORS = {
-    "Debt": "#2a78d6",
-    "Guarantee": "#1baf7a",
-    "Equity": "#eda100",
-    "Political risk insurance": "#4a3aa7",
-    "Technical assistance / grant": "#898781",
-}
-
-# Instrument coverage is not uniform, and a missing instrument is not an
-# absence of that instrument. Three institutions publish NO instrument at all.
-# AfDB is excluded for a subtler reason: its only instrument source is its own
-# IATI feed, which carries just three finance-type codes (421 standard loan,
-# 110 standard grant, 912 securities) and NO equity code. Charting AfDB would
-# show 0% equity, which is a limit of what we can see, not a fact about AfDB.
-NO_INSTRUMENT = ("EIB Global", "FMO", "BII")
-INSTRUMENT_BLIND = ("AfDB",)
-
-
-def chart_instrument_mix(as_of):
-    """What SHAPE the capital takes — and deliberately not what rank it holds.
-
-    This chart could not honestly have been drawn until recently. The
-    canonical vocabulary used to carry "Senior debt", and IFC's "Loan" and
-    EBRD's "Debt" were both mapped to it even though neither source
-    distinguishes senior from subordinated — 17,329 rows asserted a seniority
-    nobody published. The vocabulary is now a FAMILY (Debt, Equity,
-    Guarantee, ...) with seniority as an optional DETAIL, filled only where a
-    source states it. It is stated on about 2% of debt rows, which is why
-    seniority appears nowhere on this chart.
-    """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    excluded = NO_INSTRUMENT + INSTRUMENT_BLIND
-    placeholders = ",".join("?" * len(excluded))
+# ------------------------------------------------------------- exhibit 08 --
+def instrument_mix(conn, stamp):
+    """Instrument family share. The ramp follows the RISK LADDER."""
+    excluded = ("EIB Global", "FMO", "BII", "AfDB")
+    ph = ",".join("?" * len(excluded))
     rows = conn.execute(f"""
         SELECT p.institution inst, pi.canonical_instrument fam,
-               SUM(p.amount_usd) v, COUNT(DISTINCT p.id) n
+               SUM(p.amount_usd) v
         FROM projects p JOIN project_instruments pi ON pi.project_id = p.id
-        WHERE COALESCE(CAST(strftime('%Y', p.approval_date) AS INTEGER),
-                       p.fiscal_year) BETWEEN ? AND ?
-          AND p.amount_usd IS NOT NULL
-          AND p.institution NOT IN ({placeholders})
-        GROUP BY 1, 2""", (RECENT_FROM, RECENT_TO) + excluded).fetchall()
-    conn.close()
+        WHERE {WINDOW} AND p.amount_usd IS NOT NULL
+          AND p.institution NOT IN ({ph})
+        GROUP BY 1, 2""", excluded).fetchall()
 
+    # The ladder: debt deepest, then guarantee, equity, political risk
+    # insurance, technical assistance. Depth carries risk borne, which is why
+    # the dek states the ladder rather than leaving the reader to guess.
+    ladder = ["Debt", "Guarantee", "Equity", "Political risk insurance",
+              "Technical assistance / grant"]
     value = {(r["inst"], r["fam"]): (r["v"] or 0) for r in rows}
-    deals = {}
-    for r in rows:
-        deals[r["inst"]] = deals.get(r["inst"], 0) + r["n"]
-    totals = {i: sum(value.get((i, f), 0) for f in FAMILY_ORDER)
+    totals = {i: sum(value.get((i, f), 0) for f in ladder)
               for i in {r["inst"] for r in rows}}
-    # Ordered by EQUITY share: the question the chart is really asking is who
-    # takes ownership risk rather than lending.
     order = sorted(totals, key=lambda i: value.get((i, "Equity"), 0) / totals[i])
+    cols = rcfh.ramp(len(ladder), full=True)
 
-    fig, ax = brand_frame(
-        "Who actually takes equity risk",
-        "Share of each institution's committed value by instrument family,\n"
-        f"{RECENT_FROM}–{RECENT_TO}. Equity share runs from under 1% to nearly 16%.",
-        as_of,
-        note=("Six institutions. EIB Global, FMO and BII publish no instrument at all; AfDB is excluded because its only source\n"
-              "carries no equity code, so its 0% would be a blind spot, not a finding. IDB Invest publishes none on 23% of\n"
-              "its deals. SENIORITY IS DELIBERATELY NOT SHOWN: sources state it on about 2% of debt, and we no longer infer it."),
-        left=0.135)
-
-    # Draw institution-by-institution so each one's y index is known, then
-    # label every family ONCE, over the bar where it is widest. A legend needs
-    # ~40px between the ticks and the footnote and there are only ~20 spare in
-    # this frame, and a direct label is easier to read than a legend lookup.
-    widest = {}
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "Who actually takes equity risk",
+                dek=f"Share of committed value by instrument family, "
+                    f"{RECENT_FROM}\u2013{RECENT_TO}. The ramp follows the risk "
+                    "ladder: debt deepest, technical assistance shallowest.",
+                exhibit="08")
+    rcfh.legend(fig, ["Debt", "Guarantee", "Equity", "Pol. risk ins.", "TA / grant"],
+                cols)
+    rcfh.coverage(fig, included=order, excluded=list(excluded), y=0.735)
+    fig.subplots_adjust(left=0.24)
     for y, inst in enumerate(order):
         left = 0.0
-        for fam in FAMILY_ORDER:
+        for fi, fam in enumerate(ladder):
             share = value.get((inst, fam), 0) / totals[inst] * 100
             if share <= 0:
                 continue
-            ax.barh(y, share, left=left, height=0.62,
-                    color=FAMILY_COLORS[fam], edgecolor="none", zorder=3)
-            if share >= 6:
-                ax.text(left + share / 2, y, f"{share:.0f}%", va="center",
-                        ha="center", fontsize=12.5, color="white",
-                        fontweight="semibold", zorder=4)
-            if share > widest.get(fam, (0,))[0]:
-                widest[fam] = (share, y, left + share / 2)
+            ax.barh(y, share, left=left, height=0.66, color=cols[fi],
+                    edgecolor=rcfh.GROUND, linewidth=0.8, zorder=3)
+            if share >= 7:
+                ax.text(left + share / 2, y, f"{share:.0f}%", ha="center",
+                        va="center", fontsize=12, fontfamily=rcfh.MONO,
+                        color=rcfh.GROUND if fi < 2 else rcfh.INK, zorder=4)
             left += share
-        ax.text(101.5, y, f"${totals[inst]/1e9:,.0f}bn", va="center",
-                ha="left", fontsize=12.5, color=INK_2, zorder=4)
-
     ax.set_yticks(range(len(order)))
-    ax.set_yticklabels(order, fontsize=14)
-    # A clear row of headroom above the top bar, so the key sits INSIDE the
-    # plot. There are only ~20 spare pixels between the ticks and the footnote
-    # in this frame, and a key above a bar reads as belonging to the bar above.
-    ax.set_ylim(-0.6, len(order) + 0.35)
-    ax.set_xlim(0, 112)
+    ax.set_yticklabels(order)
+    ax.set_xlim(0, 118)
     ax.set_xticks([0, 25, 50, 75, 100])
-    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"], fontsize=13, color=MUTED)
-    ax.xaxis.grid(True, color=GRID, linewidth=1)
-    ax.set_axisbelow(True)
-    ax.tick_params(axis="y", labelsize=14)
-    present = [f for f in FAMILY_ORDER if f in widest]
-    handles = [Patch(facecolor=FAMILY_COLORS[f], label=f) for f in present]
-    ax.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.0, 1.0),
-              frameon=False, ncol=len(present), fontsize=12, labelcolor=INK_2,
-              handlelength=1.1, handleheight=1.1, columnspacing=1.5,
-              borderpad=0.0)
+    ax.set_xticklabels(["0", "25%", "50%", "75%", "100%"])
+    rcfh.value_labels(ax, [101] * len(order),
+                      [money(totals[i] / 1e9) for i in order], pad=0.0)
+    rcfh.emphasise_row(ax, len(order) - 1)
+    rcfh.notes(fig,
+               "Six institutions. EIB Global, FMO and BII publish no instrument "
+               "at all. AfDB is excluded for a subtler reason: its only "
+               "instrument source is its own IATI feed, which carries three "
+               "finance-type codes and no equity code, so charting it would show "
+               "0% equity, a blind spot presented as a finding. SENIORITY IS NOT "
+               "SHOWN: sources state it on about 2% of debt rows and this tracker "
+               "no longer infers it. IDB Invest publishes no instrument on 23% of "
+               "its deals, which are excluded from its bar.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "08_instrument_mix.png")
 
 
-    return save(fig, "08_instrument_mix.png")
-
-
-def chart_repeat_clients(as_of):
-    """The clients development finance keeps coming back to."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
+# ------------------------------------------------------------- exhibit 09 --
+def repeat_clients(conn, stamp):
+    """Clients banked by four or more institutions, ramp by RANK."""
     rows = conn.execute("""
         SELECT MIN(counterparty) client, COUNT(DISTINCT institution) dfis,
                COUNT(*) deals, SUM(COALESCE(amount_usd, 0)) v
         FROM projects
         WHERE counterparty_key IS NOT NULL AND counterparty_key <> ''
-        GROUP BY counterparty_key
-        HAVING dfis >= 4
+        GROUP BY counterparty_key HAVING dfis >= 4
         ORDER BY v DESC LIMIT 12""").fetchall()
     shared = conn.execute("""
         SELECT COUNT(*) FROM (SELECT counterparty_key FROM projects
           WHERE counterparty_key IS NOT NULL AND counterparty_key <> ''
           GROUP BY 1 HAVING COUNT(DISTINCT institution) >= 2)""").fetchone()[0]
-    conn.close()
+    rows = rows[::-1]
+    labels = [(r["client"][:26] + "\u2026") if len(r["client"]) > 27
+              else r["client"] for r in rows]
+    values = [r["v"] / 1e6 for r in rows]
 
-    rows = rows[::-1]                      # barh draws bottom-up
-    # Names exactly as the institutions disclosed them. Title-casing turned
-    # ABSA into "Absa" and NMB into "Nmb"; this project does not rewrite
-    # source values to look tidier.
-    labels = [r["client"] for r in rows]
-    labels = [(l[:28] + "…") if len(l) > 29 else l for l in labels]
-
-    fig, ax = brand_frame(
-        "The clients everybody banks",
-        f"{shared} companies have raised from two or more of these ten\n"
-        "institutions. These twelve are the largest that raised from four or more.",
-        as_of,
-        note=("Names appear as disclosed. Client names are DERIVED where an institution publishes no client field, by cleaning\n"
-              "the project name; AfDB and EIB Global are absent by design, their name fields hold project and asset names.\n"
-              "Matching is exact on a normalised name, never fuzzy - a missed link is safer than an invented one, so this is a FLOOR."),
-        # brand_frame draws its text from x=0.065, so the label strip is
-        # (left - 0.065) of the figure. At 0.235 a 29-character client name
-        # was clipped to "OMMERCIAL BANK OF CEYLON PLC".
-        left=0.325)
-
-    for i, r in enumerate(rows):
-        ax.barh(i, r["v"] / 1e6, height=0.6, color=ACCENT, edgecolor="none",
-                zorder=3)
-        ax.text(r["v"] / 1e6 + 20, i, f"{r['dfis']} DFIs · {r['deals']} deals",
-                va="center", ha="left", fontsize=12.5, color=INK_2, zorder=4)
-    ax.set_yticks(range(len(rows)))
-    ax.set_yticklabels(labels, fontsize=13)
-    ax.set_xlim(0, max(r["v"] for r in rows) / 1e6 * 1.30)
-    ax.xaxis.grid(True, color=GRID, linewidth=1)
-    ax.set_axisbelow(True)
-    ax.set_xlabel("US$ millions committed, all institutions combined",
-                  fontsize=13.5, color=MUTED, labelpad=14)
-    return save(fig, "09_repeat_clients.png")
+    fig, ax = rcfh.figure("tracker")
+    rcfh.header(fig, "The clients everybody banks",
+                dek=f"{shared} companies have raised from two or more of these "
+                    "ten institutions. These twelve are the largest that raised "
+                    "from four or more. The ramp follows the ranking.",
+                exhibit="09")
+    rcfh.coverage(fig, included=[i for i in ALL_TEN
+                                 if i not in ("AfDB", "EIB Global")],
+                  excluded=["AfDB", "EIB Global"])
+    fig.subplots_adjust(left=0.30)
+    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+            height=0.66, zorder=3)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(values) * 1.28)
+    rcfh.value_labels(ax, values,
+                      [f"USD {v:,.0f}M \u00b7 {r['dfis']} DFIs"
+                       for v, r in zip(values, rows)])
+    rcfh.emphasise_row(ax, len(values) - 1)
+    rcfh.notes(fig,
+               "Names appear exactly as disclosed. Client names are DERIVED "
+               "where an institution publishes no client field, by cleaning the "
+               "project name; AfDB and EIB Global are excluded by design, because "
+               "their name fields hold project and asset names rather than "
+               "clients. Matching is exact on a normalised name and never fuzzy, "
+               "since a missed link is safer than an invented one, so every count "
+               "here is a FLOOR.")
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "09_repeat_clients.png")
 
 
 def main():
-    rows, as_of = load()
-    print(f"Rendering charts from {len(rows):,} records (data as of {as_of})")
-    chart_over_time(rows, as_of)
-    chart_top_countries(rows, as_of)
-    chart_sectors(rows, as_of)
-    chart_ticket_size(rows, as_of)
-    chart_cofinancing(rows, as_of)
-    chart_thematic(as_of)
-    chart_mobilisation(as_of)
-    chart_instrument_mix(as_of)
-    chart_repeat_clients(as_of)
-    print(f"Done — {OUT_DIR}")
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    conn = connect()
+    stamp = as_of(conn)
+    n = conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
+    print(f"Rendering Bathymetric exhibits from {n:,} records "
+          f"(data as of {stamp})")
+    for fn in (commitments_over_time, top_countries, sector_mix, ticket_size,
+               cofinancing_pairs, thematic_debt, mobilisation, instrument_mix,
+               repeat_clients):
+        path = fn(conn, stamp)
+        print(f"  wrote {Path(path).name if path else fn.__name__}")
+    conn.close()
+    print(f"Done \u2014 {OUT_DIR}")
 
 
 if __name__ == "__main__":

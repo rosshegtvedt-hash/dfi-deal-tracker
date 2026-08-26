@@ -1,25 +1,86 @@
-/* Chrome & ink tokens from the dataviz reference palette; dark mode is the
-   selected dark variants, not an automatic flip. */
+/* ------------------------------------------------------------------ *
+   RCFH Advisory - Bathymetric
+
+   Depth carries magnitude, brass carries the apparatus. Two rules hold the
+   system together and both are enforced below:
+
+     BRASS NEVER FILLS. It appears as rules, ticks and the mark on whatever
+     the reader should read first. No --brass value is used as a background.
+
+     COLOUR ENCODES AN ORDERING. The ramp runs Trench -> Open water -> Shoal
+     -> Silver -> Ice, and charts map it onto rank, chronology or a technical
+     ladder. A single flat fill across every bar is not an option.
+
+   TYPE. Sitka ships with Windows and is not a webfont, so most visitors will
+   see the declared fallback, Georgia. Consolas is likewise Windows-only. The
+   stacks below name the intended faces first and fall back explicitly, which
+   the house style requires rather than leaving to the browser.
+ * ------------------------------------------------------------------ */
 :root {
-  --page: #f9f9f7;
-  --surface: #fcfcfb;
-  --ink: #0b0b0b;
-  --ink-2: #52514e;
-  --muted: #898781;
-  --grid: #e1e0d9;
-  --border: rgba(11, 11, 11, 0.1);
-  --accent: #2a78d6;
+  --abyssal:  #0B1016;
+  --trench:   #0E2A3F;
+  --open:     #2E6187;
+  --shoal:    #7FA3BC;
+  --silver:   #B7C8D3;
+  --ice:      #E2E9ED;
+  --chart-white: #FBFCFC;
+  --sounding: #5D6C77;
+  --brass:    #A8853F;
+  --fathom:   #D6DEE3;
+
+  --page: var(--chart-white);
+  --surface: #FFFFFF;
+  --ink: var(--abyssal);
+  --ink-2: #2A3540;
+  --muted: var(--sounding);
+  --grid: var(--fathom);
+  --border: var(--fathom);
+  --accent: var(--trench);
+  --band: var(--trench);
+  --band-ink: var(--chart-white);
+
+  /* Ramp for charts. Stops at Silver: Ice on Chart white nearly vanishes. */
+  --ramp-1: var(--trench);
+  --ramp-2: var(--open);
+  --ramp-3: var(--shoal);
+  --ramp-4: var(--silver);
+  --ramp-5: var(--ice);
+
+  --font-head: "Sitka Heading", "Sitka Banner", Georgia, "Times New Roman", serif;
+  --font-body: "Sitka Text", "Sitka Small", Georgia, "Times New Roman", serif;
+  --font-mono: Consolas, "SF Mono", "DejaVu Sans Mono", monospace;
 }
+
+/* ---- Dark mode: PROVISIONAL. -------------------------------------- *
+   The house style specifies Bathymetric on a light ground only, so this is
+   an extension rather than something the brand settles. It is derived, not
+   invented, by one principle: the light ramp drops the stop that disappears
+   against Chart white (Ice), so the dark ramp drops the stop that disappears
+   against Abyssal (Trench) and runs in reverse.
+
+   Two values here are genuinely new and should be reviewed: Sounding and
+   Brass both go muddy on a near-black ground, so each is lightened. Nothing
+   else departs from the published palette.
+ * ------------------------------------------------------------------ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --page: #0d0d0d;
-    --surface: #1a1a19;
-    --ink: #ffffff;
-    --ink-2: #c3c2b7;
-    --muted: #898781;
-    --grid: #2c2c2a;
-    --border: rgba(255, 255, 255, 0.1);
-    --accent: #3987e5;
+    --page: var(--abyssal);
+    --surface: #12212C;
+    --ink: var(--ice);
+    --ink-2: var(--silver);
+    --muted: #8C9BA6;        /* NEW: Sounding lightened for contrast */
+    --grid: #24323C;         /* NEW: Fathom darkened for a dark ground */
+    --border: #24323C;
+    --accent: var(--shoal);
+    --brass: #C9A45A;        /* NEW: Brass lightened; #A8853F goes muddy */
+    --band: #081019;
+    --band-ink: var(--ice);
+
+    --ramp-1: var(--ice);
+    --ramp-2: var(--silver);
+    --ramp-3: var(--shoal);
+    --ramp-4: var(--open);
+    --ramp-5: var(--trench);
   }
 }
 
@@ -28,14 +89,67 @@ html, body { margin: 0; padding: 0; }
 body {
   background: var(--page);
   color: var(--ink);
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 14px;
-  line-height: 1.45;
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
 }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 600; }
+/* Figures, axis values and timestamps are tabular by construction. */
+.mono, .num, table td.num, .stat b { font-family: var(--font-mono); }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
-.shell { max-width: 1200px; margin: 0 auto; padding: 24px 20px 40px; }
+.shell { max-width: 1200px; margin: 0 auto; padding: 0 20px 40px; }
+
+/* ---- The apparatus ------------------------------------------------ */
+/* Header band: wordmark reversed out on the left, series index on the
+   right, so an exhibit found on its own identifies its source. */
+.band {
+  background: var(--band); color: var(--band-ink);
+  margin: 0 -20px 0; padding: 12px 20px;
+  display: flex; justify-content: space-between; align-items: baseline;
+}
+.band .wordmark {
+  font-family: var(--font-head); font-weight: 700;
+  letter-spacing: 0.08em; font-size: 15px;
+}
+.band .series {
+  font-family: var(--font-mono); font-size: 12px;
+  letter-spacing: 0.06em; color: #8FB3BA;
+}
+/* Brass rule beneath the band. Brass rules, never brass fills. */
+.brass-rule { height: 1px; background: var(--brass); margin: 0 -20px 22px; }
+.brass-hair { height: 1px; background: var(--brass); margin: 26px 0 10px; }
+
+/* Coverage strip: filled chips for institutions in view, outlined for those
+   filtered out. It runs on every view, including the unfiltered one, because
+   a strip that appears only when something is missing gets ignored. */
+.coverage { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+            margin: 0 0 6px; }
+.coverage .label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+  color: var(--muted); margin-right: 8px;
+}
+.chip {
+  font-size: 12px; padding: 2px 9px; border-radius: 2px;
+  border: 1px solid transparent;
+}
+.chip.in  { background: var(--trench); color: var(--chart-white); }
+.chip.out { background: transparent; color: var(--muted);
+            border-color: var(--fathom); }
+@media (prefers-color-scheme: dark) {
+  .chip.in { background: var(--shoal); color: var(--abyssal); }
+  .chip.out { border-color: var(--grid); }
+}
+.coverage-key { font-size: 12px; color: var(--muted); margin: 0 0 18px; }
+
+/* NOTES label, brass and letterspaced, over each card's caveat. */
+.notes-label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.09em;
+  color: var(--brass); margin: 12px 0 4px;
+}
+.card .notes { font-size: 13px; color: var(--muted); margin: 0; }
+.disclaimer { font-size: 13px; color: var(--muted); margin-top: 14px; }
 h1 { font-size: 24px; margin: 0 0 4px; }
 h2 { font-size: 15px; margin: 0 0 10px; color: var(--ink); }
 .sub { color: var(--muted); margin: 0 0 20px; font-size: 13px; }

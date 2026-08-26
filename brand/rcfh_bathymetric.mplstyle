@@ -1,0 +1,56 @@
+# RCFH Advisory - Bathymetric
+# Load with: plt.style.use("<skill>/assets/rcfh_bathymetric.mplstyle")
+# Sitka ships with Windows. The fallback chain degrades to Georgia, then to a
+# generic serif, so a figure built on another machine stays legible.
+
+figure.facecolor      : FBFCFC
+figure.edgecolor      : FBFCFC
+savefig.facecolor     : FBFCFC
+savefig.edgecolor     : FBFCFC
+savefig.bbox          : standard
+savefig.dpi           : 100
+
+axes.facecolor        : FBFCFC
+axes.edgecolor        : D6DEE3
+axes.linewidth        : 0.8
+axes.grid             : True
+axes.grid.axis        : x
+axes.axisbelow        : True
+axes.labelcolor       : 5D6C77
+axes.labelsize        : 11
+axes.titlesize        : 15
+axes.titleweight      : semibold
+axes.titlecolor       : 0B1016
+axes.spines.top       : False
+axes.spines.right     : False
+axes.spines.left      : False
+axes.spines.bottom    : True
+axes.prop_cycle       : cycler('color', ['0E2A3F', '2E6187', '7FA3BC', 'B7C8D3', 'E2E9ED'])
+
+grid.color            : D6DEE3
+grid.linewidth        : 0.8
+grid.alpha            : 1.0
+
+xtick.color           : 5D6C77
+ytick.color           : 5D6C77
+xtick.labelcolor      : 5D6C77
+ytick.labelcolor      : 5D6C77
+xtick.labelsize       : 11
+ytick.labelsize       : 11
+xtick.direction       : out
+ytick.direction       : out
+xtick.major.size      : 3
+ytick.major.size      : 0
+xtick.major.width     : 0.8
+
+font.family           : serif
+font.serif            : Sitka Text, Sitka Small, Georgia, DejaVu Serif
+font.size             : 11
+
+legend.frameon        : False
+legend.fontsize       : 10
+legend.labelcolor     : 0B1016
+
+lines.linewidth       : 2.0
+lines.solid_capstyle  : butt
+patch.linewidth       : 0

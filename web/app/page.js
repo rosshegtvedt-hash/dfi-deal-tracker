@@ -3,11 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer,
-  Tooltip, XAxis, YAxis,
+  Tooltip, XAxis, YAxis, Cell,
 } from "recharts";
 
-// Fixed color per institution (dataviz reference palette, validated for both
-// modes). Color follows the entity — filtering never repaints survivors.
 // Every institution in the data — drives the filter, stats and table.
 const INSTITUTIONS = ["IFC", "EBRD", "DFC", "IDB Invest", "ADB", "AfDB", "BII",
                       "FMO", "Proparco", "EIB Global"];
@@ -26,15 +24,47 @@ const CHART_SERIES = ["IFC", "EBRD", "AfDB", "EIB Global", "IDB Invest", "DFC",
 const seriesFor = (institution) =>
   FOLDED_INTO_OTHER.has(institution) ? OTHER_SERIES : institution;
 
-const COLORS = {
-  light: { IFC: "#2a78d6", EBRD: "#1baf7a", DFC: "#eda100", "IDB Invest": "#008300", "EIB Global": "#4a3aa7", AfDB: "#e34948", [OTHER_SERIES]: "#898781" },
-  dark:  { IFC: "#3987e5", EBRD: "#199e70", DFC: "#c98500", "IDB Invest": "#008300", "EIB Global": "#9085e9", AfDB: "#e66767", [OTHER_SERIES]: "#898781" },
-};
+// Bathymetric. Depth carries magnitude and the ramp encodes an ordering;
+// a single flat fill across every bar is not an option in this system.
+// Light ground stops at Silver (Ice on Chart white nearly vanishes); the dark
+// ground reverses and stops before Trench for the mirror-image reason.
+const RAMP_LIGHT = ["#0E2A3F", "#2E6187", "#7FA3BC", "#B7C8D3", "#E2E9ED"];
+const RAMP_DARK = ["#E2E9ED", "#B7C8D3", "#7FA3BC", "#2E6187", "#0E2A3F"];
+
+// n colours interpolated along the ramp, so a fifteen-row table still reads
+// as one ordering rather than a repeat.
+function ramp(n, dark, full = false) {
+  const stops = (dark ? RAMP_DARK : RAMP_LIGHT).slice(0, full ? 5 : 4);
+  if (n <= 1) return [stops[0]];
+  const hex = (c) => [1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16));
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i / (n - 1)) * (stops.length - 1);
+    const lo = Math.floor(t), hi = Math.min(lo + 1, stops.length - 1);
+    const f = t - lo, a = hex(stops[lo]), b = hex(stops[hi]);
+    const mix = a.map((v, k) => Math.round(v + (b[k] - v) * f));
+    out.push("#" + mix.map((v) => v.toString(16).padStart(2, "0")).join(""));
+  }
+  return out;
+}
+
 const CHROME = {
-  light: { grid: "#e1e0d9", muted: "#898781", ink2: "#52514e", surface: "#fcfcfb", bar: "#2a78d6" },
-  dark:  { grid: "#2c2c2a", muted: "#898781", ink2: "#c3c2b7", surface: "#1a1a19", bar: "#3987e5" },
+  light: { grid: "#D6DEE3", muted: "#5D6C77", ink2: "#2A3540",
+           surface: "#FFFFFF", brass: "#A8853F" },
+  dark:  { grid: "#24323C", muted: "#8C9BA6", ink2: "#B7C8D3",
+           surface: "#12212C", brass: "#C9A45A" },
 };
+const ALL_TEN = ["DFC", "IFC", "EBRD", "IDB Invest", "ADB", "AfDB", "BII",
+                 "FMO", "Proparco", "EIB Global"];
 const TABLE_LIMIT = 200;
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+                "August", "September", "October", "November", "December"];
+// 2026-08-20 -> 20 August 2026. The house style runs dates long form.
+const longDate = (iso) => {
+  if (!iso || iso.length < 10) return iso || "";
+  return `${+iso.slice(8, 10)} ${MONTHS[+iso.slice(5, 7) - 1]} ${iso.slice(0, 4)}`;
+};
 
 const fmtUSD = (v) => {
   if (v == null) return "—";
@@ -93,7 +123,6 @@ function excludeDuplicates(rows) {
 
 export default function Page() {
   const dark = useDarkMode();
-  const palette = dark ? COLORS.dark : COLORS.light;
   const chrome = dark ? CHROME.dark : CHROME.light;
 
   const [data, setData] = useState(null);
@@ -213,10 +242,32 @@ export default function Page() {
 
   return (
     <main className="shell">
+      <div className="band">
+        <span className="wordmark">RCFH ADVISORY</span>
+        <span className="series">DFI DEAL FLOW TRACKER</span>
+      </div>
+      <div className="brass-rule" />
       <h1>DFI Deal Flow Tracker</h1>
       <p className="sub">
-        Development finance commitments from public disclosures · data as of {data.asOf} ·
+        Development finance commitments from public disclosures · data as of {longDate(data.asOf)} ·
         cumulative disclosed operations — coverage periods differ by institution (see notes below)
+      </p>
+
+      {/* Coverage runs on every view, including the unfiltered one. A strip
+          that appears only when something is missing trains the reader to
+          ignore it, so it is always present and always live. */}
+      <div className="coverage">
+        <span className="label">COVERAGE</span>
+        {ALL_TEN.map((i) => {
+          const shown = inst.length === 0 || inst.includes(i);
+          return (
+            <span key={i} className={shown ? "chip in" : "chip out"}>{i}</span>
+          );
+        })}
+      </div>
+      <p className="coverage-key">
+        Filled = in the current view. Outlined = filtered out. Coverage periods
+        and completeness differ by institution; see the notes below.
       </p>
 
       <div className="filters">
@@ -278,8 +329,9 @@ export default function Page() {
             <Tooltip {...tooltipStyle} formatter={(v, n) => [fmtBn(v), n]}
                      cursor={{ fill: chrome.grid, opacity: 0.35 }} />
             <Legend wrapperStyle={{ fontSize: 12, color: chrome.ink2 }} />
-            {CHART_SERIES.map((i) => (
-              <Bar key={i} dataKey={i} stackId="a" fill={palette[i]}
+            {CHART_SERIES.map((i, n) => (
+              <Bar key={i} dataKey={i} stackId="a"
+                   fill={ramp(CHART_SERIES.length, dark, true)[n]}
                    stroke={chrome.surface} strokeWidth={1} />
             ))}
           </BarChart>
@@ -297,7 +349,11 @@ export default function Page() {
               <YAxis type="category" dataKey="name" {...axisProps} width={120} />
               <Tooltip {...tooltipStyle} formatter={(v) => [fmtBn(v), "Committed"]}
                        cursor={{ fill: chrome.grid, opacity: 0.35 }} />
-              <Bar dataKey="bn" fill={chrome.bar} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="bn" radius={[0, 2, 2, 0]}>
+                {topCountries.map((_, i) => (
+                  <Cell key={i} fill={ramp(topCountries.length, dark)[i]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
           <p className="note">
@@ -314,7 +370,11 @@ export default function Page() {
               <YAxis type="category" dataKey="name" {...axisProps} width={160} />
               <Tooltip {...tooltipStyle} formatter={(v) => [fmtBn(v), "Committed"]}
                        cursor={{ fill: chrome.grid, opacity: 0.35 }} />
-              <Bar dataKey="bn" fill={chrome.bar} radius={[0, 4, 4, 0]} />
+              <Bar dataKey="bn" radius={[0, 2, 2, 0]}>
+                {bySector.map((_, i) => (
+                  <Cell key={i} fill={ramp(bySector.length, dark)[i]} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -370,6 +430,8 @@ export default function Page() {
       </div>
 
       <footer>
+        <div className="brass-hair" />
+        <p className="notes-label">NOTES</p>
         <p>
           <strong>Notes:</strong> coverage periods differ by institution — IFC (~1994→),
           EBRD (1991→), IDB Invest (1989→), AfDB (1967→) and BII (2003→) disclose
@@ -388,17 +450,19 @@ export default function Page() {
           Amounts are each institution&apos;s own commitment converted to US dollars
           (ECB annual-average rates; IMF SDR rates for AfDB&apos;s Units of Account);
           BII figures are lifetime commitment totals per activity rather than single
-          approvals. <strong>FMO here is not FMO&apos;s own investment portfolio</strong> —
-          its IATI publication covers the Dutch government funds it manages (MASSIF,
-          Building Prospects, AEF-I and others), including technical-assistance
-          contracts, so its counts and countries are not comparable with the other
-          institutions&apos;. Probable duplicates are fuzzy-matched co-financing leads;
+          approvals. Probable duplicates are fuzzy-matched co-financing leads;
           the toggle keeps each group&apos;s largest single commitment.
         </p>
         <p>
           Source: public project disclosures of DFC, IFC (via WBG Finances One), EBRD,
           IDB Invest, ADB, AfDB (MapAfrica), BII and FMO (IATI), Proparco (AFD open
-          data) and EIB Global · compiled by RCFH Advisory · DFI Deal Flow Tracker
+          data) and EIB Global. FMO is its own account only.
+          <br />Compiled by RCFH Advisory · DFI Deal Flow Tracker · Data as of{" "}
+          {longDate(data.asOf)}
+        </p>
+        <p className="disclaimer">
+          This piece reflects my own analysis. It does not constitute investment,
+          legal, or tax advice.
         </p>
       </footer>
     </main>
