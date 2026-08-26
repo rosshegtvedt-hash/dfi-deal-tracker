@@ -388,8 +388,9 @@ def mobilisation(conn, stamp):
     ratio = mob_all / own_all if own_all else 0
 
     fig, ax = rcfh.figure("tracker")
-    rcfh.header(fig, f"IDB Invest raises USD {ratio:,.2f} beside every dollar "
-                     "of its own",
+    # The tracker surface wraps titles at 52 characters. A two-line title
+    # pushes the dek down into the legend, so this one stays short.
+    rcfh.header(fig, f"Every IDB Invest dollar brings USD {ratio:,.2f} more",
                 dek="Own-account commitment and third-party capital mobilised "
                     "alongside it, USD billions per year.", exhibit="07")
     rcfh.legend(fig, ["Own account", "Third-party capital mobilised"],
