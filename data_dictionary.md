@@ -30,6 +30,8 @@ One row per project/transaction disclosed by a development finance institution.
 | `mobilised_original` | REAL | Third-party capital raised alongside this deal, in the deal's currency. **Never part of `amount_original`** — it is other people's money. Today IDB Invest only. A zero means "reported, none"; NULL means not reported. |
 | `mobilised_usd` | REAL | The same in USD, converted at the **deal's own** rate rather than a separately looked-up one, so the pair can never sit on different years. NULL rather than unconverted when there is no rate to reuse. |
 | `counterparty_provenance` | TEXT | `disclosed` (the source named the client) or `derived_from_project_name` (we cleaned it out of the project title). Always check this before quoting a client relationship. |
+| `sovereign_exposure` | TEXT | Whether the DFI's exposure is to the state: `sovereign` (the state, or state-guaranteed) or `non-sovereign`. Populated ONLY from a flag the source itself publishes — today **AfDB only**, from MapAfrica's `sovereign` boolean. **NULL means the source we loaded publishes no such flag; it does NOT mean private.** |
+| `sovereign_provenance` | TEXT | Which source flag produced the value above. Today always `afdb_sovereign_flag`. Exists because the institutions do not share a definition — EBRD's portfolio class, if ever loaded, calls a state-owned enterprise STATE while AfDB calls it non-sovereign. |
 | `description` | TEXT | Free-text project description from the source. |
 | `source_url` | TEXT | URL of the disclosure page or file this record was loaded from. |
 | `scraped_at` | TEXT | UTC timestamp (ISO) of the load run that produced this row. |
@@ -726,6 +728,77 @@ Fund II" and "Growth Fund III" are different funds and must not merge.
 Every count in `report_counterparties.py` is therefore a **floor**: 824
 clients banked by two or more DFIs, 183 by three or more, 955 clients with
 three or more deals from one institution.
+
+## Sovereign exposure (`sovereign_exposure`)
+
+### Why the field exists
+
+Ranking the ten institutions by sector puts AfDB near the top of
+infrastructure — $42.4bn over 2015–2024, second only to EIB Global. That
+number is real, and comparing it with IFC's or DFC's is close to meaningless,
+because **AfDB's load is the whole bank and theirs is a private-sector
+window.** AfDB's infrastructure operations are roughly 92% sovereign
+(Transport 754 sovereign to 33 non-sovereign; Water & Sanitation 586 to 1;
+Power 465 to 90). An unfiltered sector ranking sets a road ministry loan
+beside a solar IPP and calls them the same business.
+
+The flag was always in the export and the loader always read it — it was
+being written into `description` as prose ("Sovereign operation; window:
+ADF"), which is fine for a dashboard and useless for a filter. This field is
+the same fact in a queryable place. The prose is still written, unchanged,
+because both dashboards read it.
+
+### Why this is NOT the sibling's `ownership` vocabulary
+
+`../DFI Mandate Match/config.py` defines `OWNERSHIP_TYPES = ("sovereign",
+"sub-sovereign", "private")`, and the standing rule in this project is to
+take the sibling's vocabularies rather than invent new ones. That rule is
+deliberately **not** followed here, for a reason visible in the data.
+
+AfDB publishes a binary, and its non-sovereign window carries state-owned
+enterprises and private project companies in the same bucket:
+
+| Non-sovereign, but state-owned | Non-sovereign, and private |
+| --- | --- |
+| South Africa – Transnet III ($1,049m) | Egypt – Scatec 1.1 GW solar PV ($164m) |
+| South Africa – Eskom Holdings ($560m) | Kenya – Lake Turkana Wind Power ($148m) |
+| Mozambique – Cahora Bassa (HCB) ($188m) | South Africa – Xina Solar One ($133m) |
+| Ghana – Ghana Airports Company ($223m) | Cameroon – Nachtigal Hydro ($154m) |
+| Ethiopia – Ethiopian Airlines ($133m) | Nigeria – Dangote Industries ($330m) |
+
+Mapping `non-sovereign` onto `private` would assert an ownership the source
+never stated, for Transnet and Eskom above all. Splitting the field into the
+sibling's three values needs a separate state-owned-enterprise identification
+pass, and until that exists the honest value set is the binary AfDB actually
+publishes. `sovereign` here and `sovereign` there do mean the same thing —
+the state or a state guarantee — so the sovereign end is directly comparable;
+only the non-sovereign end is coarser.
+
+### Reading NULL
+
+**NULL means the source we loaded publishes no such flag. It does not mean
+private.** Eight of the ten institutions simply do not say, and two of those
+— EIB Global and EBRD — carry substantial public-sector books. EBRD does
+publish a portfolio class (`PRIVATE` / `STATE`, already in `description`),
+but its `STATE` is not AfDB's `sovereign`: EBRD counts a state-owned
+enterprise as state sector, AfDB counts an unguaranteed one as non-sovereign.
+The two binaries cut the same population in different places, which is what
+`sovereign_provenance` is for. Loading EBRD's is a separate decision, not a
+tidy-up.
+
+### Trusted verbatim, and guarded
+
+The value is the bank's own classification of its own exposure, so it is
+taken as published and never re-derived from a borrower's name. A name-based
+classifier was tried and rejected: it left 56% of infrastructure operations
+ambiguous and labelled 96% of ADB's **non-sovereign** dataset as public,
+because ADB titles its private deals "... Project" too.
+
+Anything other than `True`/`False` leaves the column NULL and logs
+`unmapped_sovereign_flag` — one issue per row. If MapAfrica ever switches the
+export to `1`/`0`, a lenient parse would relabel the entire bank in silence;
+this way the run reports it. Coverage today: **5,949 of 5,949 AfDB rows, 0
+unmapped** — 5,457 sovereign, 492 non-sovereign.
 
 ## Mobilisation, and the B-tranche question
 

@@ -137,6 +137,27 @@ CREATE INDEX IF NOT EXISTS idx_projects_sector      ON projects (sector);
 # Columns added after the first release, as (table, column, type).
 # get_connection() adds any that are missing, so an existing database upgrades
 # in place without losing data.
+# Whether the DFI's exposure is to the state. Populated ONLY from a flag the
+# source itself publishes; never inferred from a borrower's name.
+#
+# THIS IS DELIBERATELY NOT THE SIBLING'S THREE-VALUE `ownership` VOCABULARY
+# (sovereign / sub-sovereign / private, in ../DFI Mandate Match/config.py).
+# AfDB publishes a BINARY, and its non-sovereign window carries state-owned
+# enterprises and private project companies side by side - Transnet, Eskom,
+# Cahora Bassa and Ethiopian Airlines sit in the same bucket as Scatec, Lake
+# Turkana Wind and Xina Solar One. Mapping "non-sovereign" onto "private"
+# would assert an ownership the source never stated. Splitting this field
+# into the sibling's three values needs a separate state-owned-enterprise
+# identification pass; until then the honest value set is the one AfDB uses.
+#
+# NULL means the source we loaded publishes no such flag. It does NOT mean
+# private: eight of the ten institutions simply do not say.
+CANONICAL_SOVEREIGN_EXPOSURE = (
+    "sovereign",       # the state, or state-guaranteed
+    "non-sovereign",   # not state-guaranteed; may still be a state-owned entity
+)
+
+
 MIGRATIONS = [
     ("projects", "fiscal_year", "INTEGER"),
     ("projects", "canonical_sector", "TEXT"),
@@ -157,6 +178,8 @@ MIGRATIONS = [
     ("project_themes", "labelled_instrument", "TEXT"),
     ("project_instruments", "instrument_detail", "TEXT"),
     ("project_instruments", "detail_provenance", "TEXT"),
+    ("projects", "sovereign_exposure", "TEXT"),
+    ("projects", "sovereign_provenance", "TEXT"),
 ]
 
 

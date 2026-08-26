@@ -22,16 +22,27 @@ Column mapping (source -> our schema):
                                    (AfDB's Unit of Account = IMF SDR, 1:1);
                                    amount_usd via fx.py XDR annual averages
     environmental_safeguards    -> es_category ('Category 1..4' or FI-A/B/C)
-    sovereign / afdb_status     -> description (e.g. 'Sovereign operation;
+    sovereign                   -> sovereign_exposure ('sovereign' /
+                                   'non-sovereign') AND, with afdb_status,
+                                   -> description (e.g. 'Sovereign operation;
                                    window: ADF') — same treatment as EBRD's
-                                   private/state flag
+                                   private/state flag. The description string
+                                   is kept because the dashboards read it; the
+                                   column exists because prose is not queryable.
     identifier                  -> source_url
                                    (https://mapafrica.afdb.org/en/projects/46002-<id>)
 
 Notes:
   * Covers the ENTIRE AfDB Group history (1967→) and BOTH sovereign and
     non-sovereign operations, like our EBRD load (which includes state
-    operations). The sovereign flag is preserved in description.
+    operations). This is why AfDB is not comparable with the private-sector
+    DFIs without filtering: ~92% of its infrastructure operations are
+    sovereign, so an unfiltered sector ranking puts a road ministry loan
+    beside a solar IPP.
+  * `sovereign` is a boolean in the export and is trusted verbatim. A value
+    that is neither True nor False is logged as `unmapped_sovereign_flag` and
+    leaves the column NULL rather than guessing — the same blank-vs-absent
+    rule the mapping CSVs use.
   * UA amounts before 2003 convert at the 2003 XDR rate (the IMF's online
     archive starts there) and are logged as 'fx_rate_approximated'.
   * No sponsor, prose description, or instrument in this export — NULL.
@@ -46,7 +57,8 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from database import get_connection, log_quality_issue, utc_now  # noqa: E402
+from database import (CANONICAL_SOVEREIGN_EXPOSURE, get_connection,  # noqa: E402
+                      log_quality_issue, utc_now)
 from fx import to_usd  # noqa: E402
 
 INSTITUTION = "AfDB"
@@ -86,6 +98,28 @@ def parse_es_category(value):
     if value in {"1", "2", "3", "4"}:
         return f"Category {value}"
     return value.replace("IF-", "FI-")  # source typo: 'IF-B' appears alongside 'FI-B'
+
+
+SOVEREIGN_BY_RAW = {"True": "sovereign", "False": "non-sovereign"}
+
+
+def parse_sovereign_exposure(value):
+    """AfDB's `sovereign` boolean -> our canonical value, or (None, reason).
+
+    Trusted verbatim: this is the bank's own classification of its own
+    exposure, not something to be re-derived from a borrower's name. Anything
+    other than True/False returns a reason for the caller to log, so a change
+    in the export's encoding surfaces as a quality issue instead of silently
+    emptying the column.
+    """
+    raw = clean(value)
+    if raw is None:
+        return None, "sovereign flag is blank"
+    mapped = SOVEREIGN_BY_RAW.get(raw)
+    if mapped is None:
+        return None, f"sovereign flag is {raw!r}, expected 'True' or 'False'"
+    assert mapped in CANONICAL_SOVEREIGN_EXPOSURE  # vocabulary drift guard
+    return mapped, None
 
 
 def load(path: Path) -> None:
@@ -133,6 +167,12 @@ def load(path: Path) -> None:
                     issues += 1
 
             sovereign = clean(row.get("sovereign"))
+            sovereign_exposure, sovereign_problem = parse_sovereign_exposure(
+                row.get("sovereign"))
+            if sovereign_problem is not None:
+                log_quality_issue(conn, INSTITUTION, name,
+                                  "unmapped_sovereign_flag", sovereign_problem, raw)
+                issues += 1
             window = clean(row.get("afdb_status"))
             bits = []
             if sovereign is not None:
@@ -151,8 +191,10 @@ def load(path: Path) -> None:
                    (institution, project_name, country, region, sector, subsector,
                     instrument, amount_original, currency, amount_usd,
                     approval_date, fiscal_year, status, es_category, sponsor,
-                    description, source_url, scraped_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    description, source_url, scraped_at,
+                    sovereign_exposure, sovereign_provenance)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                           ?, ?)""",
                 (
                     INSTITUTION,
                     name,
@@ -172,6 +214,8 @@ def load(path: Path) -> None:
                     description,
                     source_url,
                     scraped_at,
+                    sovereign_exposure,
+                    "afdb_sovereign_flag" if sovereign_exposure else None,
                 ),
             )
             inserted += 1

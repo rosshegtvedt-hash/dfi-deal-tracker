@@ -357,17 +357,20 @@ python test_instrument_detail.py
 python test_counterparties.py
 python test_mobilisation.py
 python test_thematic_bonds.py
+python test_sovereign_exposure.py
 ```
 
-Eight suites, one per mechanism — instruments are one-to-many into a
+Nine suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
-replace rather than add, and enrichment may only fill silence — so a failure
-names the right thing. They prove: combined instruments produce a row each,
-deliberately-blank mappings stay silent, an unseen label is reported exactly
-once however many projects carry it, an override survives ids being
+replace rather than add, enrichment may only fill silence, and sovereign
+exposure is parsed at load time from a flag the source publishes — so a
+failure names the right thing. They prove: combined instruments produce a row
+each, deliberately-blank mappings stay silent, an unseen label is reported
+exactly once however many projects carry it, an override survives ids being
 reassigned, **enrichment never overwrites what a source published**, a
 "publishes no instrument" finding clears once the gap closes, a value outside
-the vocabulary stops the run, a rerun changes nothing, and editing a CSV
+the vocabulary stops the run, **an unexpected boolean encoding is refused
+rather than guessed at**, a rerun changes nothing, and editing a CSV
 actually takes effect. Each exits non-zero on failure, so they can gate a
 commit, and each builds a throwaway database in memory and never touches the
 real one.
@@ -426,6 +429,15 @@ institution's own spelling and are not comparable across institutions.
   Note it loads only EIB's **non-EU** operations (its EU lending is 5x
   larger and is deliberately excluded), and its rows are **loan tranches**
   rather than projects. See data_dictionary.md.
+- **AfDB caveat (important):** the MapAfrica export is the **whole bank**,
+  sovereign lending included, while IFC, DFC, IDB Invest, BII, FMO, Proparco
+  and ADB are private-sector windows. AfDB's infrastructure book is roughly
+  **92% sovereign**, so an unfiltered sector ranking sets a road ministry
+  loan beside a solar IPP. Filter on `sovereign_exposure` (`sovereign` /
+  `non-sovereign`) before comparing. **NULL on that column means the source
+  publishes no such flag — it does not mean private**; eight of the ten say
+  nothing, and EIB Global and EBRD both carry large public-sector books.
+  See data_dictionary.md.
 - **Proparco caveat (important):** the source covers only projects signed
   since 1 January 2014 **and** only those whose clients authorised
   disclosure. Proparco totals are a **floor, never a complete picture**, and
