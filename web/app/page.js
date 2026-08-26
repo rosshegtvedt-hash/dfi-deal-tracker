@@ -75,16 +75,55 @@ const fmtUSD = (v) => {
 };
 const fmtBn = (v) => `$${v.toFixed(v >= 10 ? 0 : 1)}B`;
 
-function useDarkMode() {
-  const [dark, setDark] = useState(false);
+// Effective theme, not just the operating system's. An explicit choice wins,
+// and is remembered; with no choice stored we follow the OS and keep
+// following it if the user changes it mid-session.
+const THEME_KEY = "rcfh-theme";
+
+function readStored() {
+  try {
+    const t = localStorage.getItem(THEME_KEY);
+    return t === "dark" || t === "light" ? t : null;
+  } catch (e) {
+    return null;           // private windows can throw on localStorage
+  }
+}
+
+function useTheme() {
+  // Start light so server and first client render agree; the pre-paint script
+  // in layout.js has already set data-theme, so nothing visibly flips.
+  const [choice, setChoice] = useState(null);
+  const [osDark, setOsDark] = useState(false);
+
   useEffect(() => {
+    setChoice(readStored());
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    setDark(mq.matches);
-    const onChange = (e) => setDark(e.matches);
+    setOsDark(mq.matches);
+    const onChange = (e) => setOsDark(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
   }, []);
-  return dark;
+
+  const dark = choice ? choice === "dark" : osDark;
+
+  // Reads the LIVE theme off the document rather than the closure's `dark`,
+  // so two clicks in one tick cannot both act on the same stale value.
+  const toggle = () => {
+    const root = document.documentElement;
+    const current = root.getAttribute("data-theme")
+      || (window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark" : "light");
+    const next = current === "dark" ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    setChoice(next);
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch (e) {
+      /* the choice still applies for this page view */
+    }
+  };
+
+  return [dark, toggle];
 }
 
 function MultiSelect({ label, options, selected, onChange }) {
@@ -122,7 +161,7 @@ function excludeDuplicates(rows) {
 }
 
 export default function Page() {
-  const dark = useDarkMode();
+  const [dark, toggleTheme] = useTheme();
   const chrome = dark ? CHROME.dark : CHROME.light;
 
   const [data, setData] = useState(null);
@@ -244,7 +283,13 @@ export default function Page() {
     <main className="shell">
       <div className="band">
         <span className="wordmark">RCFH ADVISORY</span>
-        <span className="series">DFI DEAL FLOW TRACKER</span>
+        <span className="right">
+          <span className="series">DFI DEAL FLOW TRACKER</span>
+          <button className="theme-toggle" onClick={toggleTheme}
+                  aria-label={`Switch to ${dark ? "light" : "dark"} mode`}>
+            {dark ? "LIGHT" : "DARK"}
+          </button>
+        </span>
       </div>
       <div className="brass-rule" />
       <h1>DFI Deal Flow Tracker</h1>

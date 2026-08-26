@@ -62,8 +62,15 @@
    Brass both go muddy on a near-black ground, so each is lightened. Nothing
    else departs from the published palette.
  * ------------------------------------------------------------------ */
+/* Three states, and the toggle must win in BOTH directions:
+     no data-theme      -> follow the operating system
+     data-theme="dark"  -> dark even on a light OS
+     data-theme="light" -> light even on a dark OS
+   The :not([data-theme="light"]) guard is what lets someone on a dark OS
+   choose light. The two blocks below are IDENTICAL BY CONSTRUCTION; if you
+   change one, change the other, or the toggle and the OS will disagree. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --page: var(--abyssal);
     --surface: #12212C;
     --ink: var(--ice);
@@ -82,6 +89,25 @@
     --ramp-4: var(--open);
     --ramp-5: var(--trench);
   }
+}
+:root[data-theme="dark"] {
+    --page: var(--abyssal);
+    --surface: #12212C;
+    --ink: var(--ice);
+    --ink-2: var(--silver);
+    --muted: #8C9BA6;        /* NEW: Sounding lightened for contrast */
+    --grid: #24323C;         /* NEW: Fathom darkened for a dark ground */
+    --border: #24323C;
+    --accent: var(--shoal);
+    --brass: #C9A45A;        /* NEW: Brass lightened; #A8853F goes muddy */
+    --band: #081019;
+    --band-ink: var(--ice);
+
+    --ramp-1: var(--ice);
+    --ramp-2: var(--silver);
+    --ramp-3: var(--shoal);
+    --ramp-4: var(--open);
+    --ramp-5: var(--trench);
 }
 
 * { box-sizing: border-box; }
@@ -118,6 +144,15 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.06em; color: #8FB3BA;
 }
 /* Brass rule beneath the band. Brass rules, never brass fills. */
+.theme-toggle {
+  background: transparent; color: var(--band-ink);
+  border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 2px;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+  padding: 3px 10px; cursor: pointer; line-height: 1.4;
+}
+.theme-toggle:hover { border-color: var(--brass); }
+.band .right { display: flex; align-items: center; gap: 14px; }
+
 .brass-rule { height: 1px; background: var(--brass); margin: 0 -20px 22px; }
 .brass-hair { height: 1px; background: var(--brass); margin: 26px 0 10px; }
 
@@ -138,9 +173,13 @@ a:hover { text-decoration: underline; }
 .chip.out { background: transparent; color: var(--muted);
             border-color: var(--fathom); }
 @media (prefers-color-scheme: dark) {
-  .chip.in { background: var(--shoal); color: var(--abyssal); }
-  .chip.out { border-color: var(--grid); }
+  :root:not([data-theme="light"]) .chip.in {
+    background: var(--shoal); color: var(--abyssal); }
+  :root:not([data-theme="light"]) .chip.out { border-color: var(--grid); }
 }
+:root[data-theme="dark"] .chip.in {
+  background: var(--shoal); color: var(--abyssal); }
+:root[data-theme="dark"] .chip.out { border-color: var(--grid); }
 .coverage-key { font-size: 12px; color: var(--muted); margin: 0 0 18px; }
 
 /* NOTES label, brass and letterspaced, over each card's caveat. */
