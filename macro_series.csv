@@ -1,0 +1,441 @@
+entity,iso3,name,indicator,year,value,income_group
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2015,50179969310921.3,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2016,51103109667903.8,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2017,52376587030216.3,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2018,53636000398827.8,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2019,54655276372914.6,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2020,52542203024740.1,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2021,55679557508204.9,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2022,57408886999170.5,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2023,58439575053271.9,
+HIC,HIC,HIC,NY.GDP.MKTP.KD,2024,59590533300228.3,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2015,50459162152163.3,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2016,51355954168304.7,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2017,54037288143069.9,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2018,57449870608804.1,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2019,58060866286532.4,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2020,56459212616119,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2021,63670629902262,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2022,65919547367217.6,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2023,68905434003872.8,
+HIC,HIC,HIC,NY.GNP.MKTP.CD,2024,71886816390362,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2015,25659752659960.1,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2016,25917599955464.9,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2017,28319199325293,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2018,30124203119691.2,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2019,31024374981412.2,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2020,30018039872473.6,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2021,35394243111591.4,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2022,37082867531465.4,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2023,38155314219988,
+LMY,LMY,LMY,NY.GDP.MKTP.CD,2024,39490940514619.9,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2015,25659752659960.1,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2016,26852489626630.5,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2017,28265968304994.9,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2018,29657119246587.4,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2019,30870483892680.9,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2020,30515266297309,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2021,32764345049399,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2022,34077552371296,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2023,35662881451694.7,
+LMY,LMY,LMY,NY.GDP.MKTP.KD,2024,37240749587461.9,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2015,75839351828606.2,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2016,77084966373474,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2017,82110104984460,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2018,87310840056717.8,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2019,88796498078977.7,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2020,86388502867289.2,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2021,98780038374127,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2022,102862471365575,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2023,107348614073350,
+WLD,WLD,WLD,NY.GDP.MKTP.CD,2024,111669432109121,
+country,BRA,Brazil,NE.GDI.FTOT.CD,2015,321439091840.342,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2016,278769334001.277,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2017,300426867329.555,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2018,289397822829.501,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2019,289819598014.537,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2020,244458436865.141,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2021,299344079147.991,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2022,347450316094.013,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2023,359586088663.658,Upper middle income
+country,BRA,Brazil,NE.GDI.FTOT.CD,2024,369608473956.357,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2015,1802212206814.5,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2016,1795693482853.01,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2017,2063514977365.65,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2018,1916933898010.99,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2019,1873288205059.69,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2020,1476107231310.49,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2021,1670647398904.9,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2022,1951923942083.32,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2023,2191131765684.63,Upper middle income
+country,BRA,Brazil,NY.GDP.MKTP.CD,2024,2185821610689.31,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2015,4694699581163.45,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2016,4706201149285.17,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2017,5192867621329.67,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2018,5995876333537.23,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2019,6151721422590.08,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2020,6275911069015.95,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2021,7526788365592.98,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2022,7552539216090.82,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2023,7391169506259.04,Upper middle income
+country,CHN,China,NE.GDI.FTOT.CD,2024,7426675490111.76,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2015,11280814787468.9,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2016,11456024084962,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2017,12537559062282.9,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2018,14147765772963.8,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2019,14560167101283.4,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2020,14996414166715.1,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2021,18201698719564,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2022,18316765021690.2,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2023,18270356654533.2,Upper middle income
+country,CHN,China,NY.GDP.MKTP.CD,2024,18729668435848,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2015,68603201437.9211,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2016,62564990483.6094,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2017,67746192353.0109,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2018,70943166882.8459,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2019,68705959026.0682,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2020,49641567077.6139,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2021,60486974112.4444,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2022,65913816191.7414,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2023,60260219997.6653,Upper middle income
+country,COL,Colombia,NE.GDI.FTOT.CD,2024,68190818310.5024,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2015,293492370193.166,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2016,282720100286.228,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2017,311866875156.879,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2018,334198218098.276,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2019,323031701192.84,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2020,270348342541.465,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2021,318524633225.395,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2022,345632492851.448,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2023,366901643683.302,Upper middle income
+country,COL,Colombia,NY.GDP.MKTP.CD,2024,420504033143.211,Upper middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2015,44973045822.1024,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2016,48098159509.2025,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2017,40516304347.8261,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2018,48339898705.6837,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2019,59823462414.5786,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2020,65090455396.1322,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2021,69158699808.7954,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2022,86024316109.4225,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2023,59910943339.8501,Lower middle income
+country,EGY,Egypt,NE.GDI.FTOT.CD,2024,45512764884.4455,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2015,329366576819.407,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2016,332441717791.411,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2017,248362771739.13,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2018,262588632526.73,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2019,318678815489.749,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2020,383817841547.099,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2021,424671765455.704,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2022,476747720364.742,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2023,395926071447.591,Lower middle income
+country,EGY,Egypt,NY.GDP.MKTP.CD,2024,389059910593.1,Lower middle income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2015,25258250741.6268,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2016,25574890829.6943,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2017,29358166666.6667,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2018,28470689734.8485,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2019,32384501728.7622,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2020,30174351129.1664,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2021,30567458851.5289,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2022,31206495322.7904,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2023,30122476599.7847,Low income
+country,ETH,Ethiopia,NE.GDI.FTOT.CD,2024,30809773549.8615,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2015,62103418181.8182,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2016,68475871209.607,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2017,76366081766.6667,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2018,83337901071.9697,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2019,91834517113.6386,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2020,98676811061.9985,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2021,109070960370.972,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2022,123140304665.399,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2023,135874093203.18,Low income
+country,ETH,Ethiopia,NY.GDP.MKTP.CD,2024,149740297952.375,Low income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2015,3641552617.45475,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2016,4015959691.13437,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2017,4140597766.44503,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2018,4438533793.64766,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2019,4226638691.82747,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2020,3559666044.9561,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2021,3913547145.20786,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2022,4934491667.23819,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2023,6604944681.32065,Upper middle income
+country,GEO,Georgia,NE.GDI.FTOT.CD,2024,7288447624.23869,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2015,15223796148.8396,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2016,15444548901.9637,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2017,16473125375.0684,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2018,17902544880.6471,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2019,17638337116.9126,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2020,16010869215.68,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2021,18853115588.8106,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2022,24984568959.605,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2023,30777833600.6515,Upper middle income
+country,GEO,Georgia,NY.GDP.MKTP.CD,2024,34189423333.141,Upper middle income
+country,GRC,Greece,NE.GDI.FTOT.CD,2015,21715847852.675,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2016,21952203262.0355,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2017,24144487127.9495,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2018,24169007568.3412,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2019,22742389982.1255,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2020,23537390555.7915,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2021,30107470683.8367,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2022,34270969836.0099,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2023,38590171314.7046,High income
+country,GRC,Greece,NE.GDI.FTOT.CD,2024,41099412975.8953,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2015,194567373678.099,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2016,193097239005.87,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2017,200381103984.298,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2018,213298873494.394,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2019,207305649887.019,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2020,191362985554.861,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2021,218303801895.326,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2022,217990189600.69,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2023,242946187738.269,High income
+country,GRC,Greece,NY.GDP.MKTP.CD,2024,256238371778.118,High income
+country,IND,India,NE.GDI.FTOT.CD,2015,604427075366.936,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2016,646867394694.409,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2017,747127475823.859,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2018,796366002399.328,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2019,806858839433.266,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2020,730885041606.85,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2021,936816398158.319,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2022,1051909283642,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2023,1116775131527.77,Lower middle income
+country,IND,India,NE.GDI.FTOT.CD,2024,1190050811692.66,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2015,2103588360044.94,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2016,2294796885663.16,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2017,2651474262755.45,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2018,2702929641648.74,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2019,2835606256558.19,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2020,2674851578587.27,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2021,3167270623260.47,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2022,3249938492013.47,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2023,3500906030644.76,Lower middle income
+country,IND,India,NY.GDP.MKTP.CD,2024,3760813470500.86,Lower middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2015,42190871475.1398,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2016,31188624327.7999,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2017,36192754523.9636,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2018,37978516017.7432,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2019,42632624791.974,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2020,42289135610.3911,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2021,45412635842.2897,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2022,49892556800.2782,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2023,65353141735.9947,Upper middle income
+country,KAZ,Kazakhstan,NE.GDI.FTOT.CD,2024,70880954234.0806,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2015,184388404706.042,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2016,137278320084.171,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2017,166805788827.233,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2018,179339977690.485,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2019,181667184854.501,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2020,171082365861.423,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2021,197112255360.612,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2022,225496328925.494,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2023,261840101059.923,Upper middle income
+country,KAZ,Kazakhstan,NY.GDP.MKTP.CD,2024,291480274648.826,Upper middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2015,15490333708.9657,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2016,14507956795.4361,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2017,16321756294.2773,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2018,17608920864.3491,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2019,19033329686.617,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2020,19448622170.7347,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2021,21596549224.9672,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2022,21293521746.9732,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2023,18773742480.1774,Lower middle income
+country,KEN,Kenya,NE.GDI.FTOT.CD,2024,21147726525.7012,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2015,70120446896.8359,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2016,74815144163.8931,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2017,82036510877.2599,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2018,92202979985.2863,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2019,100378436207.371,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2020,100657505750.545,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2021,109703658904.994,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2022,114448978152.637,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2023,107500884685.013,Lower middle income
+country,KEN,Kenya,NY.GDP.MKTP.CD,2024,120397537849.826,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2015,28563811941.1557,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2016,32003137198.6024,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2017,33351946626.4851,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2018,35475429523.3527,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2019,35056913348.7143,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2020,31825825982.0338,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2021,37334771914.819,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2022,34932671696.5237,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2023,36619974344.8492,Lower middle income
+country,MAR,Morocco,NE.GDI.FTOT.CD,2024,42495957565.197,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2015,110413823841.592,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2016,111572947004.917,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2017,118540573367.844,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2018,127341147581.818,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2019,128920266409.458,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2020,121353645057.144,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2021,142022058447.231,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2022,131245312804.483,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2023,146036093666.762,Lower middle income
+country,MAR,Morocco,NY.GDP.MKTP.CD,2024,160610994054.734,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2015,493026682800.63,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2016,404649125252.16,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2017,375745731053.427,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2018,421739251509.08,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2019,668219992686.575,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2020,598586817817.392,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2021,609147716965.348,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2022,646950257575.455,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2023,487387801877.803,Lower middle income
+country,NGA,Nigeria,NY.GDP.MKTP.CD,2024,252261880140.271,Lower middle income
+country,POL,Poland,NE.GDI.FTOT.CD,2015,97168059424.3268,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2016,86829024067.5178,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2017,92325285969.773,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2018,111524795547.381,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2019,115387530522.546,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2020,111473024921.638,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2021,116662279091.844,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2022,114331231505.479,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2023,145439219727.655,High income
+country,POL,Poland,NE.GDI.FTOT.CD,2024,156394093291.156,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2015,480054118583.367,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2016,473259623976.262,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2017,528356723263.073,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2018,594616632477.019,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2019,602683770144.88,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2020,605914237903.742,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2021,689170230665.35,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2022,695607470875.276,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2023,812451193396.143,High income
+country,POL,Poland,NY.GDP.MKTP.CD,2024,917767106146.761,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2015,44332866411.5115,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2016,42687038253.757,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2017,48076862335.5703,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2018,51286312191.1642,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2019,58166319602.1638,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2020,58800612629.5947,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2021,69851312373.8102,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2022,74195542284.3127,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2023,92322584876.3745,High income
+country,ROU,Romania,NE.GDI.FTOT.CD,2024,96756850208.7683,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2015,177885131240.315,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2016,185290759248.844,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2017,210147385855.419,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2018,241791427223.903,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2019,250080428511.595,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2020,250624575871.819,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2021,285072444957.216,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2022,295317862855.924,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2023,347757995758.914,High income
+country,ROU,Romania,NY.GDP.MKTP.CD,2024,382564217988.866,High income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2015,6938741956.55465,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2016,7175493595.53586,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2017,8172643824.61394,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2018,10530953932.4028,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2019,11999362505.6364,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2020,11984781369.7143,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2021,15250706110.3159,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2022,15974956355.6356,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2023,19012176376.5793,Upper middle income
+country,SRB,Serbia,NE.GDI.FTOT.CD,2024,21436905133.8304,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2015,41297410634.9586,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2016,42225495909.5633,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2017,45972834713.8077,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2018,52787520248.9242,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2019,53864693664.5568,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2020,55874017668.998,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2021,66159884072.5308,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2022,66809895701.2152,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2023,81343999280.0179,Upper middle income
+country,SRB,Serbia,NY.GDP.MKTP.CD,2024,90088366320.4062,Upper middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2015,9605199770.59836,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2016,9092737402.07902,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2017,8452214885.76831,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2018,8366910766.578,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2019,8144230929.79121,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2020,6733068834.05313,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2021,7463892040.95092,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2022,7330229411.00657,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2023,7586005517.41101,Lower middle income
+country,TUN,Tunisia,NE.GDI.FTOT.CD,2024,7820624627.91034,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2015,45779494041.9295,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2016,44360072680.4476,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2017,42163530590.9462,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2018,42686504459.801,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2019,41905642418.825,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2020,42491780918.361,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2021,47073234359.1819,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2022,44929920092.7955,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2023,48205328303.3398,Lower middle income
+country,TUN,Tunisia,NY.GDP.MKTP.CD,2024,51412122479.8468,Lower middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2015,259741117768.36,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2016,261622542932.684,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2017,261407412832.811,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2018,238835928004.689,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2019,205313469640.114,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2020,205053544464.269,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2021,238476195764.082,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2022,282876369713.684,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2023,375172547436.1,Upper middle income
+country,TUR,Türkiye,NE.GDI.FTOT.CD,2024,425619492593.107,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2015,865460050683.656,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2016,870818016909.84,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2017,863874522365.276,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2018,788356985773.667,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2019,775853144222.613,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2020,733628247119.077,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2021,839938668172.134,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2022,926097476913.818,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2023,1141242864657.45,Upper middle income
+country,TUR,Türkiye,NY.GDP.MKTP.CD,2024,1359123768774.12,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2015,12333519099.2341,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2016,14429422745.5991,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2017,17683722502.0365,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2018,23098699832.3413,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2019,27107797775.4734,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2020,20933487808.4501,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2021,26378582952.7165,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2022,19227326490.2418,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2023,36041065234.4432,Upper middle income
+country,UKR,Ukraine,NE.GDI.FTOT.CD,2024,35223228642.9573,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2015,91030967789.0717,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2016,93355869403.9223,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2017,112090505081.739,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2018,130891088293.55,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2019,153883047509.577,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2020,156617722013.342,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2021,199765859570.935,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2022,161989520721.19,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2023,181221517868.744,Upper middle income
+country,UKR,Ukraine,NY.GDP.MKTP.CD,2024,190833835445.1,Upper middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2015,20164024924.5821,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2016,19774628504.6494,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2017,16008852921.9792,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2018,17463000860.7028,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2019,24755761072.6749,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2020,22952824910.1308,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2021,24865722743.1567,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2022,26403281482.534,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2023,33270829830.7814,Lower middle income
+country,UZB,Uzbekistan,NE.GDI.FTOT.CD,2024,42835314179.7991,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2015,97564568986.8161,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2016,97871364319.3985,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2017,72276404057.649,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2018,61318332402.7908,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2019,70170662562.6111,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2020,70127127133.2164,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2021,81170051810.5825,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2022,94286355836.1594,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2023,107526539716.318,Lower middle income
+country,UZB,Uzbekistan,NY.GDP.MKTP.CD,2024,121356065241.228,Lower middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2015,62438804198.9852,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2016,56438178369.4115,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2017,62553047976.0233,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2018,64526291200.3588,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2019,60225422428.3377,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2020,46634961481.806,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2021,55059692138.9044,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2022,57807248255.4105,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2023,56967076153.5728,Upper middle income
+country,ZAF,South Africa,NE.GDI.FTOT.CD,2024,58253218555.3356,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2015,346709790458.563,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2016,323585509674.481,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2017,381448814653.456,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2018,405260723892.517,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2019,389330032224.269,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2020,337974655408.055,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2021,419986284375.368,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2022,407596043067.885,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2023,381440724491.232,Upper middle income
+country,ZAF,South Africa,NY.GDP.MKTP.CD,2024,401144998373.585,Upper middle income

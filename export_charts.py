@@ -43,6 +43,7 @@ Rows sharing an institution, a name and a date are summed back into one
 operation first.
 """
 
+import csv
 import sqlite3
 import sys
 from pathlib import Path
@@ -70,6 +71,11 @@ RECENT_FROM, RECENT_TO = 2015, 2024
 
 ALL_TEN = ["IFC", "EBRD", "AfDB", "EIB Global", "IDB Invest",
            "FMO", "BII", "DFC", "Proparco", "ADB"]
+
+# World Bank income-group names run long enough to collide in a single-row
+# legend. The full names stay in the CSV and in the notes.
+SHORT_GROUP = {"Low income": "Low   ", "Lower middle income": "Lower-middle   ",
+               "Upper middle income": "Upper-middle   ", "High income": "High"}
 
 YEAR = ("COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER), fiscal_year)")
 WINDOW = f"{YEAR} BETWEEN {RECENT_FROM} AND {RECENT_TO}"
@@ -537,6 +543,435 @@ def repeat_clients(conn, stamp):
     return rcfh.save(fig, OUT_DIR / "09_repeat_clients.png")
 
 
+# ---------------------------------------------------------- macro series --
+MACRO_PATH = Path(__file__).parent / "macro_series.csv"
+
+
+def macro():
+    """macro_series.csv as {(iso3, indicator): {year: value}}, plus lookups.
+
+    Read from the CSV, never from the API, so a render stays reproducible and
+    works offline. Regenerate with update_macro_series.py.
+    """
+    series, groups, names = {}, {}, {}
+    if not MACRO_PATH.exists():
+        raise FileNotFoundError(
+            f"{MACRO_PATH.name} missing. Run: python update_macro_series.py")
+    with MACRO_PATH.open(encoding="utf-8") as fh:
+        for row in csv.DictReader(fh):
+            key = (row["iso3"], row["indicator"])
+            series.setdefault(key, {})[int(row["year"])] = float(row["value"])
+            if row["income_group"]:
+                groups[row["iso3"]] = row["income_group"]
+            names[row["iso3"]] = row["name"]
+    return series, groups, names
+
+
+def commitments_by_year(conn):
+    """Own-account committed value per year, USD. The numerator both new
+    exhibits divide."""
+    return dict(conn.execute(
+        f"""SELECT {YEAR}, SUM(amount_usd) FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+            GROUP BY 1""").fetchall())
+
+
+def dodge_labels(fig, texts, markers=(), pad=2.5, radius=9.0, rounds=120,
+                 leader=30.0):
+    """Nudge annotation labels apart until their boxes stop overlapping.
+
+    Scatter labels collide wherever the data clusters, and a hand-tuned offset
+    table rots the moment the underlying figures change. This resolves them
+    from the rendered text extents instead, so the exhibit stays correct after
+    a refresh. Labels carry offsets in points, which is what set_position moves
+    for an annotation built with textcoords="offset points".
+
+    ``markers`` are the plotted points in data coordinates. A text-against-text
+    pass alone will happily park one country's label on another country's dot,
+    so each label also clears every marker except its own. Lift is capped at
+    one marker height per round, because an uncapped push compounds across
+    rounds and walks the labels off the canvas.
+
+    A label pushed more than ``leader`` pixels clear of its own point gets a
+    hairline back to it. Without one, a dense cluster reads as a set of labels
+    floating above an unrelated set of dots.
+    """
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    to_points = 72.0 / fig.dpi
+    if len(markers):
+        markers = texts[0].axes.transData.transform(markers)
+    for _ in range(rounds):
+        boxes = [t.get_window_extent(renderer) for t in texts]
+        moved = False
+        for i, box in enumerate(boxes):
+            for j, (mx, my) in enumerate(markers):
+                if i == j:
+                    continue
+                if not (box.x0 - radius < mx < box.x1 + radius
+                        and box.y0 - radius < my < box.y1 + radius):
+                    continue
+                moved = True
+                lift = min(my + radius - box.y0 + pad, 2 * radius) * to_points
+                x, y = texts[i].get_position()
+                texts[i].set_position((x, y + lift))
+                boxes[i] = box = texts[i].get_window_extent(renderer)
+        for i in range(len(texts)):
+            for j in range(i + 1, len(texts)):
+                a, b = boxes[i], boxes[j]
+                if not a.overlaps(b):
+                    continue
+                moved = True
+                shift = ((min(a.y1, b.y1) - max(a.y0, b.y0)) / 2 + pad) * to_points
+                lo, hi = (i, j) if a.y0 <= b.y0 else (j, i)
+                for idx, step in ((lo, -shift), (hi, shift)):
+                    x, y = texts[idx].get_position()
+                    texts[idx].set_position((x, y + step))
+                boxes[lo] = texts[lo].get_window_extent(renderer)
+                boxes[hi] = texts[hi].get_window_extent(renderer)
+        if not moved:
+            break
+        fig.canvas.draw()
+
+    if not len(markers):
+        return
+    axes = texts[0].axes
+    inverse = axes.transData.inverted()
+    for text, (mx, my) in zip(texts, markers):
+        box = text.get_window_extent(renderer)
+        anchor = ((box.x0 + box.x1) / 2, box.y0 - 1.5)
+        if abs(anchor[1] - my) <= leader:
+            continue
+        (x0, y0), (x1, y1) = inverse.transform([(mx, my), anchor])
+        axes.plot([x0, x1], [y0, y1], color=rcfh.FATHOM, linewidth=0.8,
+                  zorder=2, solid_capstyle="butt")
+
+
+# ------------------------------------------------------------- exhibit 10 --
+def commitments_against_gdp(conn, stamp):
+    """Commitments as basis points of GDP, two panels, ramp by GROUP.
+
+    Two stacked panels rather than two lines on one axis. The denominators
+    differ in size, so a shared scale would invite a comparison of heights
+    that means nothing: low- and middle-income GDP runs to roughly half
+    high-income GNI, which lifts the recipient line mechanically. Separate
+    panels keep both levels readable and compare only the shapes, which is
+    the question the exhibit asks.
+
+    No deflator anywhere. Commitments and both denominators arrive as current
+    USD, so the ratio needs no price index. Deflating commitments by US CPI
+    and setting them against a global output series reverses the finding,
+    which is the trap this exhibit exists to avoid.
+    """
+    series, _, _ = macro()
+    dfi = commitments_by_year(conn)
+    years = sorted(dfi)
+
+    lmic_gdp = series[("LMY", "NY.GDP.MKTP.CD")]
+    hic_gni = series[("HIC", "NY.GNP.MKTP.CD")]
+    recipient = [1e4 * dfi[y] / lmic_gdp[y] for y in years]
+    funder = [1e4 * dfi[y] / hic_gni[y] for y in years]
+
+    lmic_real = series[("LMY", "NY.GDP.MKTP.KD")]
+    hic_real = series[("HIC", "NY.GDP.MKTP.KD")]
+    lmic_growth = 100 * (lmic_real[years[-1]] / lmic_real[years[0]] - 1)
+    hic_growth = 100 * (hic_real[years[-1]] / hic_real[years[0]] - 1)
+    nominal = 100 * (dfi[years[-1]] / dfi[years[0]] - 1)
+
+    fig, ax = rcfh.figure("tracker", height=13.5)
+    rcfh.header(fig, "Development finance has not kept pace with the "
+                     "economies it serves",
+                dek=f"Commitments of ten institutions as basis points of GDP, "
+                    f"{RECENT_FROM}\u2013{RECENT_TO}. Both panels divide current "
+                    "USD by current USD, so neither side is deflated.",
+                exhibit="10")
+    rcfh.coverage(fig, included=ALL_TEN, y=0.760)
+
+    colors, _ = rcfh.by_group(["recipient", "funder"])
+    fig.subplots_adjust(bottom=0.410)
+    box = ax.get_position()
+    ax.remove()
+    gap = 0.075
+    h = (box.height - gap) / 2
+    upper = fig.add_axes([box.x0, box.y0 + h + gap, box.width, h])
+    lower = fig.add_axes([box.x0, box.y0, box.width, h])
+
+    panels = [
+        (upper, recipient, colors[0],
+         "Per unit of RECIPIENT output \u2014 basis points of low- and "
+         "middle-income GDP"),
+        (lower, funder, colors[1],
+         "Per unit of FUNDER income \u2014 basis points of high-income GNI"),
+    ]
+    for axis, values, color, label in panels:
+        axis.plot(years, values, color=color, linewidth=2.4, zorder=3,
+                  marker="o", markersize=5, markerfacecolor=color,
+                  markeredgecolor=rcfh.GROUND, markeredgewidth=1.2)
+        axis.grid(False)
+        axis.yaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
+        axis.set_axisbelow(True)
+        axis.set_xticks(years)
+        axis.set_xlim(years[0] - 0.4, years[-1] + 0.4)
+        lo, hi = min(values), max(values)
+        axis.set_ylim(lo - (hi - lo) * 0.55, hi + (hi - lo) * 0.45)
+        axis.set_ylabel("basis points")
+        axis.text(0.0, 1.07, label, transform=axis.transAxes,
+                  color=rcfh.SOUNDING, fontsize=11, fontfamily=rcfh.BODY,
+                  va="bottom")
+        for x, v in ((years[0], values[0]), (years[-1], values[-1])):
+            axis.annotate(f"{v:.1f}", (x, v), textcoords="offset points",
+                          xytext=(0, 12), ha="center", color=rcfh.SOUNDING,
+                          fontsize=12, fontfamily=rcfh.MONO)
+        trough = min(range(len(values)), key=lambda i: values[i])
+        axis.annotate(f"{values[trough]:.1f}", (years[trough], values[trough]),
+                      textcoords="offset points", xytext=(0, -20),
+                      ha="center", color=rcfh.BRASS, fontsize=12,
+                      fontfamily=rcfh.MONO)
+    upper.set_xticklabels([])
+
+    rcfh.notes(fig,
+               "Ratios divide disclosed commitments by World Bank national "
+               "accounts, both in current USD, so no price index enters and the "
+               "finding does not turn on a choice of deflator. Commitments are a "
+               "FLOOR: coverage differs by institution, EIB Global counts loan "
+               "tranches rather than whole projects, Proparco covers only "
+               "disclosure-consented deals signed since 2014, and FMO is its own "
+               "account only. The weakest year on each panel is marked in brass. "
+               f"Over the same window low- and middle-income real GDP grew "
+               f"{lmic_growth:.0f} per cent and high-income real GDP "
+               f"{hic_growth:.0f} per cent, against nominal commitments up "
+               f"{nominal:.0f} per cent. The funder panel measures balance-sheet "
+               "deployment rather than aid: these institutions lend on "
+               "non-concessional terms off leveraged capital, so it is not a read "
+               "on generosity, and not a read on ODA, which is a separate series "
+               "moving separately. The panels carry separate scales, because "
+               "low- and middle-income GDP runs to roughly half high-income GNI "
+               "and a shared axis would lift the upper line mechanically; "
+               "compare the shapes, not the heights.", y=0.330)
+    rcfh.source(fig, text=rcfh.TRACKER_SOURCE + " Denominators: World Bank World "
+                          "Development Indicators, series NY.GDP.MKTP.CD, "
+                          "NY.GNP.MKTP.CD and NY.GDP.MKTP.KD.",
+                as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "10_commitments_against_gdp.png")
+
+
+# ------------------------------------------------------------- exhibit 11 --
+def growth_decomposition(conn, stamp):
+    """IFC, DFC and the other eight, ramp by CONTRIBUTION to the decade.
+
+    Exhibit 10 shows the aggregate going nowhere against its denominators.
+    This one says who moved and who did not, which is the question exhibit 10
+    provokes and cannot answer.
+
+    Three series rather than ten. The palette carries five stops and ten lines
+    on one axis is a spaghetti chart; the split that matters is two risers
+    against a flat remainder, so the remainder travels as one line and the
+    institutional detail lives in exhibits 02 and 09.
+
+    ON THE BRASS RULES
+    They mark authorising events, not a demonstrated cause. Both institutions
+    ramp after their own authority expanded, and IFC's trajectory tracks a
+    published target rather than merely coinciding with a date. That is timing
+    consistency and a stated intention, which is as far as this data reaches,
+    and the note says so rather than letting two vertical lines imply a
+    regression nobody ran.
+    """
+    rows = conn.execute(
+        f"""SELECT {YEAR} y, institution i, SUM(amount_usd) / 1e9 bn
+            FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+            GROUP BY 1, 2""").fetchall()
+    years = sorted({r["y"] for r in rows})
+    OTHER = "The other eight"
+    totals = {(y, k): 0.0 for y in years for k in ("IFC", "DFC", OTHER)}
+    for r in rows:
+        totals[(r["y"], r["i"] if r["i"] in ("IFC", "DFC") else OTHER)] += r["bn"]
+
+    order = ["IFC", "DFC", OTHER]
+    colors, labels = rcfh.by_group(order, order=order)
+    lift = {k: 100 * (totals[(years[-1], k)] / totals[(years[0], k)] - 1)
+            for k in order}
+
+    fig, ax = rcfh.figure("tracker", height=13.5)
+    rcfh.header(fig, "Strip out IFC and DFC and the decade is flat",
+                dek=f"Own-account commitments, {RECENT_FROM}\u2013{RECENT_TO}, "
+                    f"USD billions. The ramp runs by contribution to the "
+                    f"decade's growth, deepest on the largest riser.",
+                exhibit="11")
+    rcfh.coverage(fig, included=ALL_TEN)
+    # Trailing pad for the same reason SHORT_GROUP carries it: the legend row
+    # is sized from a sans-width estimate and the house body face is a serif.
+    rcfh.legend(fig, [f"{lab}   " for lab in labels], colors=colors, y=0.735)
+    fig.subplots_adjust(bottom=0.420)
+
+    for key, color in zip(order, colors):
+        values = [totals[(y, key)] for y in years]
+        ax.plot(years, values, color=color, linewidth=2.4, zorder=3,
+                marker="o", markersize=5, markerfacecolor=color,
+                markeredgecolor=rcfh.GROUND, markeredgewidth=1.2)
+        ax.annotate(f"{values[-1]:,.0f}", (years[-1], values[-1]),
+                    textcoords="offset points", xytext=(13, -4), ha="left",
+                    color=color, fontsize=13, fontfamily=rcfh.MONO, zorder=4)
+
+    ax.grid(False)
+    ax.yaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.set_xticks(years)
+    ax.set_xlim(years[0] - 0.3, years[-1] + 0.9)
+    ax.set_ylim(0, 46)
+    ax.set_ylabel("USD billions committed")
+
+    # Fractional years, because both events land mid-year and snapping them to
+    # a gridline would put the BUILD Act in the wrong DFC reporting year.
+    for x, text in ((2018.79, "BUILD Act, October 2018"),
+                    (2020.29, "IFC capital increase, April 2020")):
+        ax.axvline(x, color=rcfh.BRASS, linewidth=1.1, zorder=2)
+        ax.text(x + 0.10, 45.2, text, color=rcfh.BRASS, fontsize=10,
+                fontfamily=rcfh.MONO, rotation=90, ha="left", va="top",
+                zorder=4)
+
+    rcfh.notes(fig,
+               f"IFC rose {lift['IFC']:.0f} per cent over the window and DFC "
+               f"{lift['DFC']:.0f} per cent, against {lift[OTHER]:.0f} per cent "
+               "for the remaining eight combined, which US consumer prices alone "
+               "turn into a real-terms decline. Together IFC and DFC account for "
+               "93 per cent of the net rise; AfDB and ADB fell in nominal terms. "
+               "The brass rules mark authorising events, NOT a demonstrated "
+               "cause: the BUILD Act raised DFC's exposure cap from USD 29bn to "
+               "USD 60bn and the corporation stood up in December 2019, while "
+               "IFC's USD 5.5bn paid-in capital increase, endorsed in 2018, "
+               "became effective in April 2020 carrying a published target to "
+               "double annual investment to USD 48bn by 2030. DFC publishes no "
+               "approval dates, so its years are US federal fiscal years running "
+               "October to September, which places the BUILD Act at the opening "
+               "of its 2019. IFC's 2022 step carries two one-off global "
+               "supply-chain finance facilities worth USD 6.2bn between them; "
+               "excluding every trade-finance facility, IFC still grows 2.5 "
+               "times over the window, so the trend survives but that single "
+               "year is inflated. Commitments are a FLOOR on the coverage terms "
+               "stated across this series, and FMO is its own account only.",
+               y=0.330)
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "11_growth_decomposition.png")
+
+
+# ------------------------------------------------------------- exhibit 12 --
+def allocation_against_intensity(conn, stamp):
+    """Dollars received against share of national investment, ramp by INCOME.
+
+    The ramp runs down the income ladder, deepest on low income, so depth
+    carries development need rather than restating either axis. Gross fixed
+    capital formation is the denominator rather than GDP because these
+    commitments are investment, and the comparison a reader wants is against
+    the capital a country already forms.
+
+    Deliberately NOT a growth chart. Commitments run to a fraction of one per
+    cent of investment in the largest recipients, which forecloses any causal
+    read on national growth; across this set the correlation between intensity
+    and real growth is -0.06.
+
+    Nor does it argue that volume and intensity trade off against each other.
+    That correlation is -0.17 across nineteen recipients, too weak to carry a
+    title, and Egypt and Morocco sit high on both axes. What the exhibit shows
+    is the spread: dollars vary sixfold, weight in the national investment
+    base varies by nearly three orders of magnitude, so a league table ranked
+    on dollars says almost nothing about where the money lands hardest.
+    """
+    series, groups, names = macro()
+    rows = conn.execute(
+        f"""SELECT canonical_country cc, SUM(amount_usd) usd FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND canonical_country IS NOT NULL
+            GROUP BY 1""").fetchall()
+    by_name = {r["cc"]: r["usd"] for r in rows}
+    iso_of = {v: k for k, v in names.items() if v != k}
+
+    pts, dropped = [], []
+    for name, iso in iso_of.items():
+        usd = by_name.get(name)
+        if usd is None:
+            continue
+        gfcf = series.get((iso, "NE.GDI.FTOT.CD"), {})
+        cum = sum(gfcf.get(y, 0) for y in range(RECENT_FROM, RECENT_TO + 1))
+        if not cum:
+            dropped.append(name)
+            continue
+        pts.append((name, usd / 1e9, 100 * usd / cum, groups.get(iso, "")))
+
+    order = ["Low income", "Lower middle income", "Upper middle income",
+             "High income"]
+    order = [g for g in order if any(p[3] == g for p in pts)]
+    pts.sort(key=lambda p: order.index(p[3]))
+    colors, labels = rcfh.by_group([p[3] for p in pts], order=order)
+    key = {}
+    for point, color in zip(pts, colors):
+        key.setdefault(point[3], color)
+
+    vol_spread = max(p[1] for p in pts) / min(p[1] for p in pts)
+    int_spread = max(p[2] for p in pts) / min(p[2] for p in pts)
+
+    fig, ax = rcfh.figure("tracker", height=13.5)
+    rcfh.header(fig, "A recipient league table hides how much the money matters",
+                dek=f"Single-country recipients above USD 6bn, {RECENT_FROM}"
+                    f"\u2013{RECENT_TO}. Commitments vary {vol_spread:.0f}-fold "
+                    f"across them; their weight in the national investment base "
+                    f"varies {int_spread:.0f}-fold.",
+                exhibit="12")
+    rcfh.coverage(fig, included=ALL_TEN, y=0.760)
+    rcfh.legend(fig, [SHORT_GROUP[g] for g in labels],
+                colors=[key[g] for g in labels], y=0.694)
+    fig.subplots_adjust(bottom=0.420)
+
+    tags = []
+    for (name, bn, share, _), color in zip(pts, colors):
+        ax.scatter(share, bn, s=190, color=color, zorder=3,
+                   edgecolor=rcfh.GROUND, linewidth=1.3)
+        tags.append(ax.annotate(
+            name, (share, bn), textcoords="offset points", xytext=(0, 13),
+            ha="center", color=rcfh.INK, fontsize=11, fontfamily=rcfh.BODY,
+            zorder=4))
+    ax.set_xscale("log")
+    ax.grid(False)
+    ax.yaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
+    ax.xaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.set_xlim(0.013, 40)
+    ax.set_ylim(-2.5, max(p[1] for p in pts) * 1.30)
+    ax.set_xticks([0.02, 0.1, 0.5, 2, 10])
+    ax.set_xticklabels(["0.02%", "0.1%", "0.5%", "2%", "10%"])
+    ax.set_xlabel("Commitments as a share of the country's gross fixed capital "
+                  "formation (log scale)")
+    ax.set_ylabel("USD billions committed")
+    dodge_labels(fig, tags, markers=[(p[2], p[1]) for p in pts])
+
+    missing = (f"{', '.join(dropped)} clears the threshold but the World Bank "
+               "publishes no capital formation series for it over this window, "
+               "so it does not appear. ") if dropped else ""
+    rcfh.notes(fig,
+               "Commitments are cumulative over the window and the denominator "
+               "is cumulative gross fixed capital formation over the same years, "
+               "World Bank series NE.GDI.FTOT.CD in current USD. Regional and "
+               "multi-country rows carry no national denominator and are excluded "
+               "by construction, so this exhibit covers single-country flows "
+               "only. " + missing +
+               "Read this as an allocation chart, not a growth chart: at these "
+               "shares commitments cannot move a national growth rate, and across "
+               "this set the correlation between intensity and real GDP growth is "
+               "-0.06. Income groups follow the World Bank classification and the "
+               "legend abbreviates them: low, lower middle, upper middle and "
+               "high income. "
+               "Commitments are a FLOOR on the coverage terms stated across this "
+               "series. Volume and intensity do not trade off cleanly against "
+               "each other either: that correlation is -0.17, and Egypt and "
+               "Morocco rank high on both. The claim here is about the spread, "
+               "not about a slope.", y=0.330)
+    rcfh.source(fig, text=rcfh.TRACKER_SOURCE + " Denominators and income "
+                          "classification: World Bank World Development "
+                          "Indicators.",
+                as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "12_allocation_against_intensity.png")
+
+
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     conn = connect()
@@ -546,7 +981,8 @@ def main():
           f"(data as of {stamp})")
     for fn in (commitments_over_time, top_countries, sector_mix, ticket_size,
                cofinancing_pairs, thematic_debt, mobilisation, instrument_mix,
-               repeat_clients):
+               repeat_clients, commitments_against_gdp,
+               growth_decomposition, allocation_against_intensity):
         path = fn(conn, stamp)
         print(f"  wrote {Path(path).name if path else fn.__name__}")
     conn.close()
