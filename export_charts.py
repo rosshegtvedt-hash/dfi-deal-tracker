@@ -972,6 +972,408 @@ def allocation_against_intensity(conn, stamp):
     return rcfh.save(fig, OUT_DIR / "12_allocation_against_intensity.png")
 
 
+# ------------------------------------------------- infrastructure series --
+# Exhibits 13 to 16 read the infrastructure book. Two conventions hold across
+# all four:
+#
+#   * INFRA is the harmonised canonical sector, never a source label. Each
+#     institution publishes its own taxonomy and the mapping file does the
+#     reconciliation, so "Infrastructure" here means the same thing in ten
+#     books that spell it ten ways.
+#   * Anything counting or averaging DEALS runs on OPERATIONS, per the rule at
+#     the top of this file. Exhibit 14 would be wrong by a wide margin
+#     otherwise: EIB Global discloses loan tranches, so a port financed in six
+#     parts would enter a ticket-size distribution as six small cheques.
+INFRA = "Infrastructure"
+
+INFRA_SUBSECTORS = ["Transport & Logistics", "Energy & Utilities",
+                    "Water & Sanitation", "Municipal & Environmental"]
+
+# One operation per (institution, name, year, sector), summed back from the
+# rows the sources publish. Adding the sector columns to exhibit 04's key
+# splits the 199 operations whose rows carry more than one canonical sector
+# and the 76 that carry more than one subsector, out of 12,546. That is
+# tolerable where the exhibit SUMS value, which a regrouping cannot change,
+# and intolerable where it counts or averages deals, so exhibit 14 uses the
+# unmodified house key instead.
+OPERATIONS = f"""
+    SELECT institution, lower(project_name) nm, {YEAR} y,
+           canonical_sector sector, canonical_subsector subsector,
+           MAX(sovereign_exposure) sovereign, SUM(amount_usd) v
+    FROM projects
+    WHERE {WINDOW} AND {OWN_ACCOUNT}
+    GROUP BY institution, nm, y, sector, subsector
+"""
+
+# Exhibit 04's key, unmodified. An operation joins a subsector's distribution
+# when any of its rows carries that subsector, so the 76 spanning two appear
+# in both; the alternative assigns a cheque to one subsector by a tiebreak
+# nobody published.
+HOUSE_KEY = f"institution, lower(project_name), {YEAR}"
+
+# The two institutions that produced 93 per cent of the decade's growth
+# (exhibit 11). Exhibit 13 exists because both are infrastructure-light, so
+# their expansion moves the sector's SHARE without anyone committing less.
+GROWTH_PAIR = ("IFC", "DFC")
+
+
+def percentile(sorted_values, q):
+    """Nearest-rank percentile. No interpolation: these are cheque sizes, and
+    an interpolated value would name an amount nobody committed."""
+    if not sorted_values:
+        return 0.0
+    return sorted_values[min(int(q * len(sorted_values)), len(sorted_values) - 1)]
+
+
+# ------------------------------------------------------------- exhibit 13 --
+def infrastructure_share(conn, stamp):
+    """Infrastructure's share of commitments, whole panel against the eight.
+
+    Grouped by a real attribute rather than ramped by sequence, because the
+    finding IS the grouping: the two series diverge, and colour should carry
+    which panel a line belongs to.
+    """
+    rows = conn.execute(
+        f"""SELECT {YEAR} y,
+                   SUM(CASE WHEN canonical_sector = ? THEN amount_usd ELSE 0 END) infra,
+                   SUM(amount_usd) total,
+                   SUM(CASE WHEN canonical_sector = ? AND institution NOT IN (?, ?)
+                            THEN amount_usd ELSE 0 END) infra_eight,
+                   SUM(CASE WHEN institution NOT IN (?, ?)
+                            THEN amount_usd ELSE 0 END) total_eight
+            FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+            GROUP BY 1 ORDER BY 1""",
+        (INFRA, INFRA, *GROWTH_PAIR, *GROWTH_PAIR)).fetchall()
+    years = [r["y"] for r in rows]
+    all_ten = [100 * r["infra"] / r["total"] for r in rows]
+    eight = [100 * r["infra_eight"] / r["total_eight"] for r in rows]
+
+    # The levels the note quotes, so the exhibit cannot drift from its caption.
+    lvl = conn.execute(
+        f"""SELECT SUM(CASE WHEN {YEAR} = ? THEN amount_usd ELSE 0 END) / 1e9 first,
+                   SUM(CASE WHEN {YEAR} = ? THEN amount_usd ELSE 0 END) / 1e9 last
+            FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND canonical_sector = ? AND institution NOT IN (?, ?)""",
+        (RECENT_FROM, RECENT_TO, INFRA, *GROWTH_PAIR)).fetchone()
+    rise = 100 * (lvl["last"] / lvl["first"] - 1)
+
+    order = ["All ten institutions", "Excluding IFC and DFC"]
+    colors, labels = rcfh.by_group(order, order=order)
+
+    fig, ax = rcfh.figure("tracker", height=12.5)
+    rcfh.header(fig, "Composition explains infrastructure's flat share",
+                dek=f"Infrastructure as a share of own-account commitments, "
+                    f"{RECENT_FROM}–{RECENT_TO}. Colour carries which "
+                    "panel of institutions a line describes.", exhibit="13")
+    rcfh.coverage(fig, included=ALL_TEN)
+    rcfh.legend(fig, [f"{lab}   " for lab in labels], colors=colors, y=0.735)
+    fig.subplots_adjust(bottom=0.395)
+
+    for series, color in ((all_ten, colors[0]), (eight, colors[1])):
+        ax.plot(years, series, color=color, linewidth=2.4, zorder=3,
+                marker="o", markersize=5, markerfacecolor=color,
+                markeredgecolor=rcfh.GROUND, markeredgewidth=1.2)
+        ax.annotate(f"{series[-1]:.0f}%", (years[-1], series[-1]),
+                    textcoords="offset points", xytext=(13, -4), ha="left",
+                    color=color, fontsize=13, fontfamily=rcfh.MONO, zorder=4)
+
+    ax.grid(False)
+    ax.yaxis.grid(True, color=rcfh.FATHOM, linewidth=0.8)
+    ax.set_axisbelow(True)
+    ax.set_xticks(years)
+    ax.set_xlim(years[0] - 0.3, years[-1] + 0.9)
+    ax.set_ylim(0, 55)
+    ax.set_ylabel("Infrastructure share of commitments, per cent")
+
+    rcfh.notes(
+        fig,
+        f"The gap between the lines carries the finding. Infrastructure "
+        f"commitments ROSE over the window at nine of the ten institutions; "
+        f"the eight outside "
+        f"IFC and DFC took theirs from USD {lvl['first']:,.1f}bn to USD "
+        f"{lvl['last']:,.1f}bn, a rise of {rise:.0f} per cent, on a book that "
+        "grew 5 per cent. Their infrastructure share therefore climbs. The "
+        "whole-panel line stays flat because IFC and DFC tripled over the same "
+        "decade and both run infrastructure-light books, so the sector's share "
+        "falls arithmetically while no institution retreats from it. Exhibit 11 "
+        "carries that growth decomposition. Two smaller cautions: 2022 is "
+        "further depressed by two one-off IFC supply-chain finance facilities "
+        "worth USD 6.2bn, which lift the denominator alone, and DFC publishes "
+        "no approval dates, so its years are US federal fiscal years. Sectors "
+        "are harmonised from ten source taxonomies and deals with no source "
+        "sector are excluded rather than assigned.", y=0.305)
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "13_infrastructure_share.png")
+
+
+# ------------------------------------------------------------- exhibit 14 --
+def infrastructure_ticket_size(conn, stamp):
+    """Cheque-size distribution by infrastructure subsector, ramp by RANK.
+
+    Plots the MEDIAN, because the mean is the wrong statistic here and saying
+    so is most of the point: infrastructure's distribution is long-tailed to
+    the right, so its mean sits near the 70th percentile and describes almost
+    nobody's deal.
+    """
+    def spread(where, params=()):
+        values = sorted(r[0] for r in conn.execute(
+            f"""SELECT SUM(amount_usd) v FROM projects
+                WHERE {WINDOW} AND {OWN_ACCOUNT} AND {where}
+                GROUP BY {HOUSE_KEY} HAVING v IS NOT NULL AND v > 0""", params))
+        return dict(n=len(values),
+                    p25=percentile(values, 0.25) / 1e6,
+                    median=percentile(values, 0.50) / 1e6,
+                    p75=percentile(values, 0.75) / 1e6,
+                    mean=(sum(values) / len(values) / 1e6) if values else 0.0)
+
+    rows = [(s, spread("canonical_sector = ? AND canonical_subsector = ?",
+                       (INFRA, s))) for s in INFRA_SUBSECTORS]
+    rows.append(("All infrastructure", spread("canonical_sector = ?", (INFRA,))))
+    rows.append(("All other sectors", spread("canonical_sector <> ?", (INFRA,))))
+    rows.sort(key=lambda kv: kv[1]["median"])
+
+    labels = [k for k, _ in rows]
+    medians = [v["median"] for _, v in rows]
+    infra = dict(rows)["All infrastructure"]
+
+    fig, ax = rcfh.figure("tracker", height=12.0)
+    # The headline number is read off the same computation the bars use, so a
+    # data refresh can never leave the title contradicting the chart.
+    rcfh.header(fig, f"Half of infrastructure deals fall under USD "
+                     f"{infra['median']:,.0f}m",
+                dek=f"Committed value per operation, {RECENT_FROM}–"
+                    f"{RECENT_TO}. Bars are medians and the ramp follows them; "
+                    "the rule spans the middle half of each distribution.",
+                exhibit="14")
+    rcfh.coverage(fig, included=ALL_TEN)
+    fig.subplots_adjust(left=0.295, bottom=0.400)
+
+    ax.barh(range(len(medians)), medians, color=rcfh.by_rank(medians),
+            height=0.52, zorder=3)
+    for i, (_, v) in enumerate(rows):
+        # Interquartile rule and mean marker in Sounding: they carry the
+        # distribution, and brass is reserved for the emphasised row.
+        ax.plot([v["p25"], v["p75"]], [i + 0.36, i + 0.36],
+                color=rcfh.SOUNDING, linewidth=1.4, zorder=4,
+                solid_capstyle="butt")
+        for x in (v["p25"], v["p75"]):
+            ax.plot([x, x], [i + 0.28, i + 0.44], color=rcfh.SOUNDING,
+                    linewidth=1.4, zorder=4)
+        # Below the bar, not level with it: the median label occupies the row
+        # centre and the two collide on the shortest bar.
+        ax.plot([v["mean"]], [i - 0.36], marker="D", markersize=6,
+                markerfacecolor=rcfh.GROUND, markeredgecolor=rcfh.SOUNDING,
+                markeredgewidth=1.4, zorder=5)
+
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(v["p75"] for _, v in rows) * 1.20)
+    ax.set_xlabel("USD millions per operation")
+    rcfh.value_labels(ax, medians, [f"USD {m:,.0f}M" for m in medians])
+    # The title quotes the all-infrastructure median, so brass marks that row
+    # rather than the tallest bar.
+    rcfh.emphasise_row(ax, labels.index("All infrastructure"))
+
+    transport = dict(rows)["Transport & Logistics"]
+    municipal = dict(rows)["Municipal & Environmental"]
+    rcfh.notes(
+        fig,
+        f"The diamond marks the MEAN. Infrastructure's mean commitment reaches "
+        f"USD {infra['mean']:,.0f}m against a median of USD "
+        f"{infra['median']:,.0f}m, because a handful of very large operations "
+        f"pull it upward; the mean sits above roughly seven deals in ten and "
+        f"describes almost none of them. The subsector spread matters more "
+        f"than either statistic: a transport sponsor and a municipal one "
+        f"choose between different markets, at USD "
+        f"{transport['median']:,.0f}m against USD {municipal['median']:,.0f}m "
+        f"at the median. Figures run per OPERATION, not per disclosed row, so "
+        "the loan tranches EIB Global publishes and the facilities EBRD splits "
+        "are summed back into one cheque first; skipping that step understated "
+        "the largest tickets by roughly a quarter. Percentiles are "
+        "nearest-rank, never interpolated, so every figure names an amount "
+        "somebody committed. An operation whose rows carry two subsectors "
+        "enters both distributions, which affects 76 of 12,546. Deals with no "
+        "disclosed amount are excluded rather than imputed.", y=0.310)
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "14_infrastructure_ticket_size.png")
+
+
+# ------------------------------------------------------------- exhibit 15 --
+def infrastructure_es_risk(conn, stamp):
+    """High E&S grades, infrastructure against the rest of the same book.
+
+    Grouped rather than ranked: the comparison is the finding, and each
+    institution is its own control. Cross-institution levels are NOT
+    comparable here (the scales differ), which is exactly why the exhibit
+    holds each bank against itself.
+    """
+    rows = conn.execute(
+        f"""SELECT institution i,
+               SUM(CASE WHEN canonical_sector = ? THEN 1 ELSE 0 END) n_infra,
+               100.0 * SUM(CASE WHEN canonical_sector = ?
+                    AND canonical_es_category = 'High' THEN 1 ELSE 0 END)
+                    / NULLIF(SUM(CASE WHEN canonical_sector = ? THEN 1 ELSE 0 END), 0) hi_infra,
+               SUM(CASE WHEN canonical_sector <> ? THEN 1 ELSE 0 END) n_rest,
+               100.0 * SUM(CASE WHEN canonical_sector <> ?
+                    AND canonical_es_category = 'High' THEN 1 ELSE 0 END)
+                    / NULLIF(SUM(CASE WHEN canonical_sector <> ? THEN 1 ELSE 0 END), 0) hi_rest
+            FROM projects
+            WHERE canonical_es_category IS NOT NULL AND {WINDOW} AND {OWN_ACCOUNT}
+            GROUP BY 1 HAVING n_infra >= 20""", (INFRA,) * 6).fetchall()
+    # Ordered by the RATIO rather than the level, because the levels are not
+    # comparable across institutions and the ratio is what the title claims.
+    rows = sorted(rows, key=lambda r: r["hi_infra"] / max(r["hi_rest"], 0.01))
+    labels = [r["i"] for r in rows]
+    infra = [r["hi_infra"] for r in rows]
+    rest = [r["hi_rest"] for r in rows]
+    shown = {r["i"] for r in rows}
+    top = rows[-1]
+
+    order = ["Infrastructure", "Everything else"]
+    colors, keys = rcfh.by_group(order, order=order)
+
+    fig, ax = rcfh.figure("tracker", height=12.0)
+    rcfh.header(fig, "Infrastructure concentrates the high-risk grades",
+                dek=f"Share of operations graded highest environmental and "
+                    f"social risk, {RECENT_FROM}–{RECENT_TO}, each "
+                    "institution against its own book, ordered by the "
+                    "multiple between the two.", exhibit="15")
+    # Coverage first at its default row, legend below it. Both helpers set the
+    # axes top and the LAST call wins, so reversing these two lines drops the
+    # plot straight onto the coverage chips.
+    rcfh.coverage(fig, included=[i for i in ALL_TEN if i in shown],
+                  excluded=[i for i in ALL_TEN if i not in shown])
+    rcfh.legend(fig, [f"{lab}   " for lab in keys], colors=colors, y=0.735)
+    fig.subplots_adjust(left=0.255, bottom=0.400)
+
+    h = 0.34
+    idx = range(len(labels))
+    ax.barh([i + h / 2 for i in idx], infra, height=h, color=colors[0], zorder=3)
+    ax.barh([i - h / 2 for i in idx], rest, height=h, color=colors[1], zorder=3)
+    ax.set_yticks(list(idx))
+    ax.set_yticklabels(labels)
+    limit = max(infra) * 1.42
+    ax.set_xlim(0, limit)
+    ax.set_xlabel("Operations graded highest risk, per cent")
+    for i, (a, b) in enumerate(zip(infra, rest)):
+        ax.text(a + max(infra) * 0.014, i + h / 2, f"{a:.0f}%",
+                color=rcfh.SOUNDING, fontsize=12, fontfamily=rcfh.MONO,
+                va="center")
+        ax.text(b + max(infra) * 0.014, i - h / 2, f"{b:.0f}%",
+                color=rcfh.SOUNDING, fontsize=12, fontfamily=rcfh.MONO,
+                va="center")
+        # The multiple in a right-hand column, so the row ORDER explains
+        # itself. Bar length follows the level, which is ordered differently.
+        mult = a / max(b, 0.01)
+        # A decimal below 3x, because rounding 1.27 to "1x" reads as no gap.
+        ax.text(limit * 0.985, i,
+                f"{mult:.1f}×" if mult < 3 else f"{mult:.0f}×",
+                color=rcfh.INK, fontsize=13, fontfamily=rcfh.MONO,
+                ha="right", va="center")
+    ax.text(limit * 0.985, len(labels) - 0.62, "MULTIPLE", color=rcfh.SOUNDING,
+            fontsize=10, fontfamily=rcfh.MONO, ha="right", va="center")
+    rcfh.emphasise_row(ax, len(labels) - 1)
+
+    rcfh.notes(
+        fig,
+        f"Read each pair against itself and never across institutions. The "
+        f"banks run different scales, harmonised here onto a shared ladder: "
+        f"Proparco and FMO grade on four levels, the other four on three, so "
+        f"the LEVELS carry different meanings while the gap within one book "
+        f"stays meaningful. That gap runs from {top['hi_infra'] / max(top['hi_rest'], 0.01):.0f} "
+        f"times at {top['i']} down to under twice at FMO. The datasets we load "
+        "from ADB, BII, EBRD and EIB Global carry no grade at all, so those "
+        "four cannot appear; whether each discloses one elsewhere has not been "
+        "checked here, and their absence is a limit of this tracker rather "
+        "than a finding about their practice. AfDB is the one institution here "
+        "lending mostly to sovereigns and the pattern survives that: its "
+        "infrastructure book grades 53 per cent highest-risk on sovereign "
+        "operations and 52 per cent on non-sovereign ones. Fourteen Proparco "
+        "operations carry a financial-intermediary or unrated grade that maps "
+        "to nothing on the shared ladder and drop out. Grades measure assessed "
+        "risk at approval and say nothing about outcomes.", y=0.300)
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "15_infrastructure_es_risk.png")
+
+
+# ------------------------------------------------------------- exhibit 16 --
+def sovereign_gradient(conn, stamp):
+    """AfDB infrastructure by subsector, split on who borrows.
+
+    AfDB ONLY, and the note says so twice. It is the single institution of the
+    ten whose disclosure states whether the borrower is the state, so this is
+    the only place in the tracker where the question can be asked at all.
+    """
+    rows = conn.execute(
+        f"""SELECT subsector,
+                   SUM(CASE WHEN sovereign = 'sovereign' THEN v ELSE 0 END) / 1e9 sov,
+                   SUM(CASE WHEN sovereign = 'non-sovereign' THEN v ELSE 0 END) / 1e9 non
+            FROM ({OPERATIONS})
+            WHERE sector = ? AND institution = 'AfDB' AND v IS NOT NULL
+              AND subsector IS NOT NULL
+            GROUP BY 1 ORDER BY (sov + non)""", (INFRA,)).fetchall()
+    labels = [r["subsector"] for r in rows]
+    sov = [r["sov"] for r in rows]
+    non = [r["non"] for r in rows]
+    share = [100 * n / (s + n) if (s + n) else 0 for s, n in zip(sov, non)]
+
+    order = ["Sovereign borrower", "Non-sovereign borrower"]
+    colors, keys = rcfh.by_group(order, order=order)
+
+    fig, ax = rcfh.figure("tracker", height=12.0)
+    # The title says "state guarantee", never "private capital": the shallow
+    # segment holds unguaranteed state-owned enterprises as well as project
+    # companies, and the note below says so. A title claiming private capital
+    # would contradict its own exhibit.
+    rcfh.header(fig, "Water borrows behind a sovereign guarantee",
+                dek=f"AfDB infrastructure commitments by borrower type, "
+                    f"{RECENT_FROM}–{RECENT_TO}, USD billions. Unguaranteed "
+                    "exposure runs from 23 per cent in energy to 0.3 per cent "
+                    "in water.", exhibit="16")
+    # Coverage first, legend below: see the note in exhibit 15.
+    rcfh.coverage(fig, included=["AfDB"],
+                  excluded=[i for i in ALL_TEN if i != "AfDB"])
+    rcfh.legend(fig, [f"{lab}   " for lab in keys], colors=colors, y=0.735)
+    fig.subplots_adjust(left=0.295, bottom=0.400)
+
+    idx = range(len(labels))
+    ax.barh(list(idx), sov, height=0.54, color=colors[0], zorder=3)
+    ax.barh(list(idx), non, height=0.54, left=sov, color=colors[1], zorder=3)
+    ax.set_yticks(list(idx))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(s + n for s, n in zip(sov, non)) * 1.30)
+    ax.set_xlabel("USD billions committed")
+    for i, (s, n, pct) in enumerate(zip(sov, non, share)):
+        ax.text(s + n + max(sov) * 0.03, i,
+                f"{pct:4.1f}% non-sovereign", color=rcfh.SOUNDING,
+                fontsize=12, fontfamily=rcfh.MONO, va="center")
+    # Brass marks the row the TITLE argues about, which is water, not the
+    # longest bar. Colour carries the ordering; brass carries the finding.
+    rcfh.emphasise_row(ax, labels.index("Water & Sanitation"))
+
+    rcfh.notes(
+        fig,
+        "AfDB ONLY, and the exhibit cannot be widened: of the ten "
+        "institutions, only AfDB states per project whether the borrower is "
+        "the state or state-guaranteed. Eight of the others publish nothing on "
+        "this, and a blank records our ignorance rather than a private "
+        "borrower. The gradient carries the finding. Unguaranteed money "
+        "reaches energy, which sells a metered product under a power purchase "
+        "agreement, and reaches transport, where a concession can charge a "
+        "user. It stops at water, where tariffs answer to politics and cost "
+        "recovery rarely clears. Read the shallow segment as exposure taken "
+        "without a sovereign guarantee, never as private capital: AfDB's "
+        "non-sovereign window holds state-owned enterprises lending "
+        "unguaranteed, Transnet and Eskom among them, beside genuine project "
+        "companies, and the source does not separate the two. Splitting them "
+        "would need a state-owned-enterprise pass this tracker has not run.",
+        y=0.310)
+    rcfh.source(fig, as_of=stamp)
+    return rcfh.save(fig, OUT_DIR / "16_sovereign_gradient.png")
+
+
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     conn = connect()
@@ -982,7 +1384,9 @@ def main():
     for fn in (commitments_over_time, top_countries, sector_mix, ticket_size,
                cofinancing_pairs, thematic_debt, mobilisation, instrument_mix,
                repeat_clients, commitments_against_gdp,
-               growth_decomposition, allocation_against_intensity):
+               growth_decomposition, allocation_against_intensity,
+               infrastructure_share, infrastructure_ticket_size,
+               infrastructure_es_risk, sovereign_gradient):
         path = fn(conn, stamp)
         print(f"  wrote {Path(path).name if path else fn.__name__}")
     conn.close()

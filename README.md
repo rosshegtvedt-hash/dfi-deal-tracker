@@ -76,10 +76,29 @@ last pipeline run loaded.
 python export_charts.py
 ```
 
-Writes nine LinkedIn-sized (1200x1200) PNGs into `charts/`: commitments over
-time, top countries, sector mix, average ticket size, co-financing pairs,
-labelled debt by institution, mobilisation, instrument mix, and repeat
-clients.
+Writes sixteen branded PNGs into `charts/`. Exhibits 01-09 describe the whole
+book: commitments over time, top countries, sector mix, average ticket size,
+co-financing pairs, labelled debt by institution, mobilisation, instrument
+mix, and repeat clients. Exhibits 10-12 put commitments over a denominator
+(GDP, the growth decomposition, allocation against intensity) and read
+`macro_series.csv`.
+
+Exhibits 13-16 are the **infrastructure series**, the sector that takes about
+29% of all commitments:
+
+- **13, infrastructure share.** Infrastructure's share of the whole panel sits
+  flat across the decade while the eight institutions outside IFC and DFC take
+  theirs from 34% to 47%. The flat line is a composition effect: IFC and DFC
+  tripled and both run infrastructure-light books.
+- **14, ticket size.** Medians with the interquartile range and the mean
+  marked, because infrastructure's mean commitment (USD 57m) sits above 71% of
+  its own deals and describes almost none of them. The median is USD 25m.
+- **15, environmental and social risk.** Each institution against its own
+  book, ordered by the multiple. Four institutions publish no grade in the
+  data we load and cannot appear.
+- **16, sovereign gradient.** AfDB only, the one institution that states per
+  project whether the borrower is the state. Unguaranteed exposure runs from
+  23% of energy to 0.3% of water.
 
 Two of them exclude institutions on purpose, and say so on the canvas. The
 **instrument mix** chart covers six institutions: EIB Global, FMO and BII
