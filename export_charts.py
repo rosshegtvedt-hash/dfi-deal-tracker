@@ -1063,7 +1063,13 @@ def infrastructure_share(conn, stamp):
     colors, labels = rcfh.by_group(order, order=order)
 
     fig, ax = rcfh.figure("tracker", height=12.5)
-    rcfh.header(fig, "Composition explains infrastructure's flat share",
+    # "falling" is read off the series, never asserted. This title said "flat"
+    # until the AfDB envelope correction moved the 2015 endpoint by four
+    # points; a hard-coded adjective survives a data refresh and a computed
+    # one does not.
+    verdict = ("falling" if all_ten[0] - all_ten[-1] > 1.5
+               else "rising" if all_ten[-1] - all_ten[0] > 1.5 else "flat")
+    rcfh.header(fig, f"Composition explains infrastructure's {verdict} share",
                 dek=f"Infrastructure as a share of own-account commitments, "
                     f"{RECENT_FROM}–{RECENT_TO}. Colour carries which "
                     "panel of institutions a line describes.", exhibit="13")
@@ -1094,10 +1100,12 @@ def infrastructure_share(conn, stamp):
         f"the eight outside "
         f"IFC and DFC took theirs from USD {lvl['first']:,.1f}bn to USD "
         f"{lvl['last']:,.1f}bn, a rise of {rise:.0f} per cent, on a book that "
-        "grew 5 per cent. Their infrastructure share therefore climbs. The "
-        "whole-panel line stays flat because IFC and DFC tripled over the same "
-        "decade and both run infrastructure-light books, so the sector's share "
-        "falls arithmetically while no institution retreats from it. Exhibit 11 "
+        f"grew 5 per cent, and their infrastructure share climbs from "
+        f"{eight[0]:.0f} to {eight[-1]:.0f} per cent. The whole-panel line "
+        f"goes the other way, {all_ten[0]:.0f} to {all_ten[-1]:.0f} per cent, "
+        "because IFC and DFC tripled over the same decade and both run "
+        "infrastructure-light books, so the sector's share falls "
+        "arithmetically while no institution retreats from it. Exhibit 11 "
         "carries that growth decomposition. Two smaller cautions: 2022 is "
         "further depressed by two one-off IFC supply-chain finance facilities "
         "worth USD 6.2bn, which lift the denominator alone, and DFC publishes "
@@ -1330,8 +1338,11 @@ def sovereign_gradient(conn, stamp):
     rcfh.header(fig, "Water borrows behind a sovereign guarantee",
                 dek=f"AfDB infrastructure commitments by borrower type, "
                     f"{RECENT_FROM}–{RECENT_TO}, USD billions. Unguaranteed "
-                    "exposure runs from 23 per cent in energy to 0.3 per cent "
-                    "in water.", exhibit="16")
+                    f"exposure runs from {max(share):.0f} per cent in "
+                    f"{labels[share.index(max(share))].split(' &')[0].lower()} "
+                    f"to {min(share):.1f} per cent in "
+                    f"{labels[share.index(min(share))].split(' &')[0].lower()}"
+                    ".", exhibit="16")
     # Coverage first, legend below: see the note in exhibit 15.
     rcfh.coverage(fig, included=["AfDB"],
                   excluded=[i for i in ALL_TEN if i != "AfDB"])
