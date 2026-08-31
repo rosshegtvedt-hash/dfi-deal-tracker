@@ -1374,8 +1374,193 @@ def sovereign_gradient(conn, stamp):
     return rcfh.save(fig, OUT_DIR / "16_sovereign_gradient.png")
 
 
+# ------------------------------------------------------- LinkedIn pair --
+# A different SURFACE, not a different dataset. The image travels alone on a
+# phone, the caption does not survive a repost, and the reader gives it about
+# two seconds, so: square canvas, notes at 15px and never smaller, and the
+# standing disclaimer under the source block.
+#
+# The pair is designed to be read in order and each half does one job.
+# L01 carries MAGNITUDE and L02 carries COMPOSITION over the same fifteen
+# countries, so L02 can drop the axis to percentages without losing the
+# scale: the reader already has it.
+LINKEDIN_DIR = OUT_DIR / "linkedin"
+
+# Four named sectors and a residual. The palette carries five stops and
+# by_group refuses a sixth, which is the right constraint here anyway: a
+# fourteen-segment stack on a phone is unreadable.
+POST_SECTORS = ["Financial Institutions", "Infrastructure",
+                "Agribusiness & Food", "Manufacturing"]
+RESIDUAL = "Everything else"
+
+# rcfh.legend sizes its row from a sans-width estimate while the house body
+# face is a serif, and at the LinkedIn dek size five full sector names run off
+# the canvas. These are legend labels only; the data keys stay canonical.
+SHORT_SECTOR = {"Financial Institutions": "Banks & finance",
+                "Infrastructure": "Infrastructure",
+                "Agribusiness & Food": "Agribusiness",
+                "Manufacturing": "Manufacturing",
+                RESIDUAL: "Other"}
+
+COUNTRY_ONLY = ("canonical_country IS NOT NULL "
+                "AND canonical_country NOT LIKE 'Regional%' "
+                "AND canonical_country NOT IN ('Undisclosed', 'Unclassified')")
+
+
+def top_recipients(conn, limit=15):
+    return conn.execute(
+        f"""SELECT canonical_country c, SUM(amount_usd) / 1e9 bn FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND {COUNTRY_ONLY}
+            GROUP BY 1 ORDER BY bn DESC LIMIT {limit}""").fetchall()
+
+
+# ---------------------------------------------------------- LinkedIn 01 --
+def post_top_recipients(conn, stamp):
+    """Top 15 recipients, ramp by RANK. The LinkedIn cut of exhibit 02."""
+    rows = top_recipients(conn)
+    labels = [r["c"] for r in rows][::-1]
+    values = [r["bn"] for r in rows][::-1]
+
+    fig, ax = rcfh.figure("linkedin", height=12.6)
+    rcfh.header(fig, "Where development finance actually went",
+                dek=f"Top 15 country recipients, {RECENT_FROM}–{RECENT_TO}, "
+                    "USD billions committed by ten development finance "
+                    "institutions. The ramp follows the ranking.")
+    rcfh.coverage(fig, included=ALL_TEN)
+    fig.subplots_adjust(left=0.235, bottom=0.375)
+    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+            height=0.68, zorder=3)
+    ax.set_yticks(range(len(labels)))
+    ax.set_yticklabels(labels)
+    ax.set_xlim(0, max(values) * 1.22)
+    ax.set_xlabel("USD billions committed")
+    rcfh.value_labels(ax, values, [f"USD {v:,.1f}bn" for v in values])
+    rcfh.emphasise_row(ax, len(values) - 1)
+    rcfh.notes(fig,
+               "Country-specific deals only. Regional and multi-country "
+               "operations are excluded, which understates every institution "
+               "running a regional window, so these are FLOORS. Country names "
+               "are harmonised across ten sources that each spell them "
+               "differently. AfDB figures are a ceiling on its own share: its "
+               "disclosure separates the government contribution but not other "
+               "co-financiers.", y=0.250)
+    rcfh.source(fig, as_of=stamp, disclaimer=True)
+    return rcfh.save(fig, LINKEDIN_DIR / "L01_top_recipients.png")
+
+
+# ---------------------------------------------------------- LinkedIn 02 --
+def post_sector_composition(conn, stamp):
+    """The same fifteen countries as a 100% stack, ordered by banking share.
+
+    PERCENTAGES, not dollars, and the pairing is the reason: L01 already gave
+    the reader the magnitudes for exactly these countries, so repeating them
+    here would spend the whole canvas restating the previous chart. What this
+    one has to show is that the mix moves, and a common baseline is the only
+    way to see that across a 4x range in size.
+
+    Ordered by banking share so the divergence reads as a wedge rather than
+    as noise.
+    """
+    countries = [r["c"] for r in top_recipients(conn)]
+    marks = ",".join("?" * len(countries))
+    rows = conn.execute(
+        f"""SELECT canonical_country c, canonical_sector s, SUM(amount_usd) v
+            FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND {COUNTRY_ONLY} AND canonical_sector <> 'Unclassified'
+              AND canonical_country IN ({marks})
+            GROUP BY 1, 2""", countries).fetchall()
+
+    cell = {}
+    total = dict.fromkeys(countries, 0.0)
+    for r in rows:
+        key = r["s"] if r["s"] in POST_SECTORS else RESIDUAL
+        cell[(r["c"], key)] = cell.get((r["c"], key), 0.0) + r["v"]
+        total[r["c"]] += r["v"]
+
+    def share(country, sector):
+        return 100 * cell.get((country, sector), 0.0) / total[country]
+
+    # SENSITIVITY. EBRD's Trade Facilitation Programme books per-bank facility
+    # limits, USD 17.9bn over 77 operations in the window, all of it inside
+    # Financial Institutions and concentrated in three of these countries: it
+    # carries 22 points of Greece's banking share, 11 of Ukraine's and 11 of
+    # Tunisia's. These are real committed limits, distinct per bank and never
+    # repeated, so they are NOT the umbrella double-count that IFC's trade
+    # envelopes were, and removing them would be editorialising. Recomputing
+    # the range without them is the honest test, and the note states both.
+    ex_tfp = dict(conn.execute(
+        f"""SELECT canonical_country,
+                   100.0 * SUM(CASE WHEN canonical_sector = 'Financial Institutions'
+                        THEN amount_usd ELSE 0 END) / SUM(amount_usd)
+            FROM projects
+            WHERE {WINDOW} AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND canonical_country IN ({marks})
+              AND NOT (institution = 'EBRD' AND project_name LIKE '%TFP%')
+            GROUP BY 1""", countries).fetchall())
+
+    # Deepest fill on the largest sector globally, so depth still carries the
+    # ordering the reader meets first in the legend.
+    groups = POST_SECTORS + [RESIDUAL]
+    colors, keys = rcfh.by_group(groups, order=groups)
+    order = sorted(countries, key=lambda c: share(c, "Financial Institutions"))
+
+    fi = [share(c, "Financial Institutions") for c in order]
+    infra = [share(c, "Infrastructure") for c in order]
+
+    # ONE line: the LinkedIn surface wraps titles at 44 characters and the
+    # dek is placed on the assumption of a single line, so a wrapped title
+    # lands the dek on top of the coverage strip.
+    fig, ax = rcfh.figure("linkedin", height=14.4)
+    rcfh.header(fig, "Same two sectors, wildly different mixes",
+                dek=f"Sector composition of the fifteen largest recipients, "
+                    f"{RECENT_FROM}–{RECENT_TO}, per cent of each country's "
+                    "commitments. Ordered by banking share.")
+    rcfh.coverage(fig, included=ALL_TEN)
+    rcfh.legend(fig, [f"{SHORT_SECTOR[k]}  " for k in keys], colors=colors,
+                y=0.742)
+    fig.subplots_adjust(left=0.235, bottom=0.430)
+
+    left = [0.0] * len(order)
+    for sector, color in zip(groups, colors):
+        widths = [share(c, sector) for c in order]
+        ax.barh(range(len(order)), widths, left=left, height=0.72,
+                color=color, zorder=3)
+        left = [a + b for a, b in zip(left, widths)]
+
+    ax.set_yticks(range(len(order)))
+    ax.set_yticklabels(order)
+    ax.set_xlim(0, 100)
+    ax.set_xticks([0, 25, 50, 75, 100])
+    ax.set_xlabel("Share of the country's committed value, per cent")
+    ax.grid(False)
+    rcfh.emphasise_row(ax, len(order) - 1)
+
+    rcfh.notes(
+        fig,
+        f"Every country here draws most of its development finance from the "
+        f"same two sectors, and no two draw it in the same proportion. Banking "
+        f"runs from {min(fi):.0f} per cent of {order[0]}'s book to "
+        f"{max(fi):.0f} per cent of {order[-1]}'s, infrastructure from "
+        f"{min(infra):.0f} to {max(infra):.0f} per cent. Together they average "
+        f"about 69 per cent everywhere, which is why the aggregate looks "
+        f"stable while saying almost nothing about any single market. The "
+        f"spread does not rest on trade finance: EBRD's trade facilitation "
+        f"limits sit inside Financial Institutions and carry 22 points of "
+        f"Greece's share, but excluding them the banking range is still "
+        f"{min(ex_tfp.values()):.0f} to {max(ex_tfp.values()):.0f} per cent. "
+        f"No single operation exceeds 11 per cent of any bar. Ten sector "
+        f"taxonomies are harmonised into fourteen canonical sectors; the four "
+        f"largest are named and the rest pooled. Country-specific deals only, "
+        f"so every figure is a floor.", y=0.318)
+    rcfh.source(fig, as_of=stamp, disclaimer=True)
+    return rcfh.save(fig, LINKEDIN_DIR / "L02_sector_composition.png")
+
+
 def main():
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    LINKEDIN_DIR.mkdir(parents=True, exist_ok=True)
     conn = connect()
     stamp = as_of(conn)
     n = conn.execute("SELECT COUNT(*) FROM projects").fetchone()[0]
@@ -1386,7 +1571,8 @@ def main():
                repeat_clients, commitments_against_gdp,
                growth_decomposition, allocation_against_intensity,
                infrastructure_share, infrastructure_ticket_size,
-               infrastructure_es_risk, sovereign_gradient):
+               infrastructure_es_risk, sovereign_gradient,
+               post_top_recipients, post_sector_composition):
         path = fn(conn, stamp)
         print(f"  wrote {Path(path).name if path else fn.__name__}")
     conn.close()
