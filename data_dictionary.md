@@ -729,6 +729,70 @@ Every count in `report_counterparties.py` is therefore a **floor**: 824
 clients banked by two or more DFIs, 183 by three or more, 955 clients with
 three or more deals from one institution.
 
+## AfDB amounts: the programme envelope trap (corrected 2026-08-31)
+
+### What was wrong
+
+The loader read MapAfrica's `total_commitments (UA)`. That column carries the
+**programme envelope across all financiers**, not AfDB's own commitment. The
+file also publishes `total_commitments_nongov (UA)`, which excludes the
+government counterpart contribution, and the two disagree on **2,182 of 5,949
+rows (36.7%)**. We were always taking the larger.
+
+The worst case, and the one that surfaced it:
+
+| Ethiopia — Basic Services Transformation Programme, 2015 | UA |
+| --- | --- |
+| `total_commitments` (what we loaded) | 5,580,000,000 |
+| `total_commitments_nongov` (what we load now) | 180,000,000 |
+| `total_disbursements` | 180,000,000 |
+
+Project status: **Completion**. A completed project does not disburse 3% of
+its commitment. That single row entered the database at **USD 7,786M**, 7.4
+times the largest infrastructure operation anywhere in it, and carried
+Ethiopia into the **top fifteen recipients** on that one row: USD 11.02bn
+total, 71% of it from this project, 8.2% infrastructure and 71% "Health &
+Education". Exhibit 02 shipped with Ethiopia at number 12.
+
+### The evidence for the narrower column
+
+1. **Disbursements track it.** Across the 2,182 divergent rows, disbursements
+   land within 15% of `nongov` in **94%** of cases, and reach 85% of the
+   envelope in only 46%.
+2. **Distribution.** AfDB's p99.9 is USD 2.0bn. The envelope column produced
+   six rows above USD 2bn, topping out at USD 10.4bn.
+3. **Medupi cross-check.** AfDB's Medupi loan is widely reported at roughly
+   USD 2.6bn. `nongov` gives USD 1.94bn and disbursements USD 2.27bn; the
+   envelope says USD 10.4bn, which is the order of the whole project cost.
+
+### What this does NOT establish
+
+`nongov` excludes the government counterpart. Whether the remainder is AfDB
+alone or AfDB **plus other external financiers** cannot be determined from
+this export. AfDB's IATI feed is no help: it republishes the same envelope
+figure (`total-Commitment` = 5,580,000,000 for the Ethiopia programme), so
+the two channels agree with each other and neither isolates AfDB's own share.
+
+**Treat AfDB as a CEILING on its own commitment.** It is a much tighter
+ceiling than before and it is no longer a precise figure.
+
+### Effect
+
+| | before | after |
+| --- | --- | --- |
+| AfDB, all time | USD 255.1bn | USD 199.7bn (−21.7%) |
+| AfDB, 2015–2024 | USD 104.2bn | USD 90.2bn (−13.4%) |
+| Whole database | USD 1.263tn | USD 1.207tn |
+
+Ethiopia leaves the top fifteen recipients (USD 11.02bn → 3.4bn) and Romania
+enters at fifteen. Every exhibit was regenerated. Row counts, instrument
+rows, themes, duplicate groups and counterparties are unchanged: this touched
+amounts only.
+
+Divergences are logged per row as `programme_envelope_amount`, with both
+figures in the detail, so the correction is auditable deal by deal.
+`test_afdb_amounts.py` is the regression.
+
 ## Sovereign exposure (`sovereign_exposure`)
 
 ### Why the field exists

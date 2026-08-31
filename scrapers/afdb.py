@@ -18,9 +18,14 @@ Column mapping (source -> our schema):
     AfDB Sector                 -> sector (rolled up via sector_mapping.csv)
     activity_status             -> status (Approved/Ongoing/Completion/Cancelled)
     Approval Date               -> approval_date
-    total_commitments (UA)      -> amount_original with currency='XDR'
-                                   (AfDB's Unit of Account = IMF SDR, 1:1);
-                                   amount_usd via fx.py XDR annual averages
+    total_commitments_nongov    -> amount_original with currency='XDR'
+      (UA)                         (AfDB's Unit of Account = IMF SDR, 1:1);
+                                   amount_usd via fx.py XDR annual averages.
+                                   NOT `total_commitments (UA)`, which is the
+                                   PROGRAMME ENVELOPE across all financiers -
+                                   see parse_commitment() and the data
+                                   dictionary. Divergences are logged as
+                                   `programme_envelope_amount`.
     environmental_safeguards    -> es_category ('Category 1..4' or FI-A/B/C)
     sovereign                   -> sovereign_exposure ('sovereign' /
                                    'non-sovereign') AND, with afdb_status,
@@ -122,6 +127,42 @@ def parse_sovereign_exposure(value):
     return mapped, None
 
 
+COMMITMENT_COL = "total_commitments_nongov (UA)"
+PROGRAMME_COL = "total_commitments (UA)"
+
+
+def parse_commitment(row):
+    """Return (UA amount, note) for AfDB's own commitment.
+
+    MapAfrica publishes TWO commitment figures and they disagree on 37% of
+    rows. `total_commitments` is the PROGRAMME envelope: for Ethiopia's Basic
+    Services Transformation Programme it reads UA 5,580m against UA 180m in
+    `total_commitments_nongov` and UA 180m DISBURSED on a project marked
+    Completion. Loading the envelope put a single USD 7.79bn row into the
+    database, 7.4x the largest infrastructure operation anywhere in it, and
+    carried Ethiopia into the top fifteen recipients on that row alone.
+
+    We take the narrower figure. Across the 2,182 divergent rows disbursements
+    land within 15% of it in 94% of cases and reach 85% of the envelope in
+    only 46%, so the narrow column is the one AfDB actually pays out against.
+
+    CAUTION, and it is stated in the data dictionary too: what "nongov"
+    excludes is the government counterpart contribution. Whether the
+    remainder is AfDB alone or AfDB plus other external financiers is NOT
+    determinable from this export, and AfDB's IATI feed republishes the same
+    envelope figure rather than resolving it. AfDB therefore remains a
+    CEILING on its own commitment, never a precise one.
+    """
+    envelope = clean(row.get(PROGRAMME_COL))
+    own = clean(row.get(COMMITMENT_COL))
+    if own is None:
+        return envelope, None
+    if envelope is not None and abs(float(envelope) - float(own)) > 1:
+        return own, (f"programme envelope UA {float(envelope):,.0f} replaced by "
+                     f"UA {float(own):,.0f} excluding government contribution")
+    return own, None
+
+
 def load(path: Path) -> None:
     print(f"Reading {path.name}")
     df = pd.read_csv(path, dtype=str)
@@ -147,11 +188,15 @@ def load(path: Path) -> None:
                                   "Approval Date missing", raw)
                 issues += 1
 
-            amount_ua = clean(row.get("total_commitments (UA)"))
+            amount_ua, envelope_note = parse_commitment(row)
+            if envelope_note is not None:
+                log_quality_issue(conn, INSTITUTION, name,
+                                  "programme_envelope_amount", envelope_note, raw)
+                issues += 1
             amount_usd = None
             if amount_ua is None:
                 log_quality_issue(conn, INSTITUTION, name, "missing_amount",
-                                  "total_commitments (UA) is blank", raw)
+                                  f"{COMMITMENT_COL} is blank", raw)
                 issues += 1
             else:
                 amount_ua = float(amount_ua)

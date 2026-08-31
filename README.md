@@ -377,9 +377,10 @@ python test_counterparties.py
 python test_mobilisation.py
 python test_thematic_bonds.py
 python test_sovereign_exposure.py
+python test_afdb_amounts.py
 ```
 
-Nine suites, one per mechanism — instruments are one-to-many into a
+Ten suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
 replace rather than add, enrichment may only fill silence, and sovereign
 exposure is parsed at load time from a flag the source publishes — so a
@@ -448,6 +449,15 @@ institution's own spelling and are not comparable across institutions.
   Note it loads only EIB's **non-EU** operations (its EU lending is 5x
   larger and is deliberately excluded), and its rows are **loan tranches**
   rather than projects. See data_dictionary.md.
+- **AfDB amounts are a CEILING (important):** MapAfrica publishes two
+  commitment columns and they disagree on 37% of rows. We load
+  `total_commitments_nongov (UA)`, which excludes the government counterpart;
+  `total_commitments (UA)` is the **programme envelope across all
+  financiers** and loading it overstated AfDB by 21.7% all-time. Whether the
+  narrower column is AfDB alone or AfDB plus other external financiers cannot
+  be told from the export, and AfDB's IATI feed republishes the same envelope
+  figure, so treat AfDB as a ceiling. Divergences are logged as
+  `programme_envelope_amount`. See data_dictionary.md.
 - **AfDB caveat (important):** the MapAfrica export is the **whole bank**,
   sovereign lending included, while IFC, DFC, IDB Invest, BII, FMO, Proparco
   and ADB are private-sector windows. AfDB's infrastructure book is roughly
