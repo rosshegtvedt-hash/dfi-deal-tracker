@@ -13,3 +13,15 @@ data/review_export.xlsx
 
 # Local tooling
 .claude/
+
+# Database — 38MB binary, rebuilt by the scraper pipeline (see README)
+data/*.db
+data/*.sqlite3
+# NOTE: web/public/data.json stays tracked on purpose — Vercel builds the
+# public dashboard from it, so untracking it would break the deploy.
+
+# Secrets — never version
+.env
+.env.*
+*.pem
+*.key
