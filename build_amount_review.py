@@ -194,7 +194,7 @@ def reasons(r):
         out.append("trade-finance line")
     if (r["institution"] == "IFC" and (r["raw_country"] or "").strip().lower()
             == "world region" and r["amount_usd"] >= 500e6):
-        out.append("IFC 'World Region' record that kept a programme envelope")
+        out.append("IFC 'World Region' record of USD 500m or more")
     return out
 
 
@@ -203,10 +203,11 @@ def context(r):
     notes = []
     if "IFC 'World Region'" in " ".join(r["reasons"]):
         notes.append(
-            "The IFC loader lets World Region records keep a programme-sized "
-            "amount, assuming each is the programme's own record. GTSF has 7 "
-            "such records at USD 1bn each and GSCF 2 at USD 3.1bn; GSCF Citi "
-            "II's page says IFC's investment is up to USD 250m.")
+            "IFC's trade programmes stamp their whole envelope on partner "
+            "records. Since 24 Sep 2026 the loader blanks it wherever several "
+            "World Region records share one (GSCF, GTSF), but a LONE World "
+            "Region record keeps its amount as the programme's own. Check "
+            "whether this is the programme itself or one partner bank.")
     if "trade-finance line" in r["reasons"]:
         notes.append(
             "Trade lines revolve: check whether the figure is a LIMIT (one "
@@ -304,10 +305,13 @@ def write_start_here(wb, n_rows, counts, built_from):
         ("p", "Can't verify: no link, a dead page, or a page with no amount. Say which "
               "in Notes. This is a legitimate result, not a failure."),
         ("p", "Unsure - discuss: anything you'd rather talk through. Say why in Notes."),
-        ("h", "Worked example (a real one, checked while building this sheet)"),
-        ("p", "IFC 'GSCF Citi II', 2022. Our amount: USD 3,115,000,000. The page, "
+        ("h", "Worked example (a real one, found while building this sheet)"),
+        ("p", "IFC 'GSCF Citi II', 2022. Our amount was USD 3,115,000,000. The page, "
               "under 'Total Project Cost and Amount and Nature of IFC's Investment', "
-              "says: 'The IFC Investment will be in amount of up to US$250 million'."),
+              "says: 'The IFC Investment will be in amount of up to US$250 million'. "
+              "This one led to a loader fix on 24 September 2026, so it is no longer "
+              "in the queue, but it is exactly what an error looks like. Filled in, "
+              "it would read:"),
         ("ex", "Verdict: Wrong - programme or envelope total, not this deal  |  Amount "
                "on page: 250000000  |  Currency: USD  |  Page calls it: IFC "
                "Investment (up to)  |  Notes: USD 3,115m is the GSCF programme "
