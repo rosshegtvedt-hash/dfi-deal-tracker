@@ -39,7 +39,13 @@ Notes:
     totals. The partner-bank participation size is not disclosed, so those
     amounts are set to NULL and logged as 'program_envelope_amount' issues
     (original value preserved in the log). The program-level record itself,
-    booked to 'World Region', keeps the envelope amount.
+    booked to 'World Region', keeps the envelope amount — but only when it is
+    the ONLY World Region record in its group. GSCF's two World Region
+    records are both partner banks (Citi, SMBC; Citi's page says IFC's own
+    investment is up to $250M against a $3,115M envelope), and GTSF has seven
+    World Region records, six of them named participations. Where more than
+    one exists the program's own record cannot be told apart, so none keeps
+    the envelope.
 """
 
 import json
@@ -160,8 +166,18 @@ ENVELOPE_MIN_USD = 500_000_000
 ENVELOPE_MIN_COUNT = 3
 
 
+def is_world_region(rec):
+    return (rec["country"] or "").strip().lower() == "world region"
+
+
 def flag_program_envelopes(records, conn):
-    """NULL out program-envelope amounts on partner-bank records; log each."""
+    """NULL out program-envelope amounts on partner-bank records; log each.
+
+    The program's own record keeps the envelope, and is recognised as the
+    group's single World Region record. Partner banks can be booked to World
+    Region too (GSCF: two, both partners; GTSF: seven), so with more than one
+    there is no telling which is the program's and every one is NULLed.
+    """
     groups = defaultdict(list)
     for rec in records:
         if rec["amount"] and rec["amount"] >= ENVELOPE_MIN_USD and rec["approval_date"]:
@@ -171,14 +187,21 @@ def flag_program_envelopes(records, conn):
     for (approved, amount), members in groups.items():
         if len(members) < ENVELOPE_MIN_COUNT:
             continue
+        world = [rec for rec in members if is_world_region(rec)]
+        program_record = world[0] if len(world) == 1 else None
         for rec in members:
-            if (rec["country"] or "").strip().lower() == "world region":
+            if rec is program_record:
                 continue  # the program-level record legitimately keeps the envelope
+            why = ""
+            if is_world_region(rec):
+                why = (f"; booked to World Region, but so are {len(world) - 1} other "
+                       f"record(s) in this group, so it cannot be identified as the "
+                       f"program's own record")
             log_quality_issue(
                 conn, INSTITUTION, rec["name"], "program_envelope_amount",
                 f"Amount ${amount:,.0f} appears identically on {len(members)} records "
                 f"approved {approved} — this is the program-level envelope, not this "
-                f"participation's own size, so amount is set to NULL", rec["raw"],
+                f"participation's own size, so amount is set to NULL{why}", rec["raw"],
             )
             rec["amount"] = None
             nulled += 1

@@ -97,7 +97,18 @@ logged, never silently dropped or filled in.
   program-level envelope (e.g. $7,000M repeated on 55 records), not the
   bank's own facility size. Those amounts are set to NULL and logged as
   `program_envelope_amount` (original value preserved in the log); the
-  program's own "World Region" record keeps the envelope.
+  program's own "World Region" record keeps the envelope, **but only when it
+  is the only World Region record in its group** (corrected 2026-09-24).
+  Partner banks can be booked to World Region too: GSCF's two World Region
+  records (Citi II, SMBC) are both partners, and Citi's page gives IFC's own
+  investment as up to USD 250M against the USD 3,115M each record carried;
+  GTSF has seven World Region records at USD 1,000M, six of them named
+  participations. With more than one there is no telling which is the
+  program's, so none keeps the envelope — GTSF's own program record included.
+  Effect: nine amounts NULLed, IFC USD 339.7bn → 326.5bn, of which
+  USD 6.23bn (GSCF, 2022) fell inside the 2015–2024 exhibit window. GTFP's
+  single World Region record still keeps USD 7,000M. Regression suite:
+  `test_ifc_envelopes.py`.
 
 ### EBRD (`scrapers/ebrd.py`)
 

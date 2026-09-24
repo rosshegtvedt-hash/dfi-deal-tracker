@@ -398,9 +398,10 @@ python test_thematic_bonds.py
 python test_sovereign_exposure.py
 python test_afdb_amounts.py
 python test_backup.py
+python test_ifc_envelopes.py
 ```
 
-Eleven suites, one per mechanism — instruments are one-to-many into a
+Twelve suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
 replace rather than add, enrichment may only fill silence, and sovereign
 exposure is parsed at load time from a flag the source publishes — so a

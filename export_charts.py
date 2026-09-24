@@ -44,8 +44,10 @@ operation first.
 """
 
 import csv
+import re
 import sqlite3
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib
@@ -79,6 +81,14 @@ SHORT_GROUP = {"Low income": "Low   ", "Lower middle income": "Lower-middle   ",
 
 YEAR = ("COALESCE(CAST(strftime('%Y', approval_date) AS INTEGER), fiscal_year)")
 WINDOW = f"{YEAR} BETWEEN {RECENT_FROM} AND {RECENT_TO}"
+
+# A trade-finance facility, by name: the programme acronyms (TFP, TFFP, GTFP,
+# GTLP, GTSF, GSCF, TECF) plus the plain-language terms. Exhibit 11 uses it to
+# show IFC's growth does not rest on trade finance. Names only, so a trade
+# line published under a client's bare name escapes it.
+TRADE_FINANCE = re.compile(
+    r"\b(TFP|TFFP|GTFP|GTLP|GTSF|GSCF|TECF)\b|trade|supply chain",
+    re.IGNORECASE)
 
 # FMO publishes its own book alongside Dutch government funds it merely
 # administers. Only own-account rows belong beside institutions that lend off
@@ -784,13 +794,30 @@ def growth_decomposition(conn, stamp):
     years = sorted({r["y"] for r in rows})
     OTHER = "The other eight"
     totals = {(y, k): 0.0 for y in years for k in ("IFC", "DFC", OTHER)}
+    by_inst = defaultdict(float)
     for r in rows:
         totals[(r["y"], r["i"] if r["i"] in ("IFC", "DFC") else OTHER)] += r["bn"]
+        by_inst[(r["y"], r["i"])] += r["bn"]
 
     order = ["IFC", "DFC", OTHER]
     colors, labels = rcfh.by_group(order, order=order)
     lift = {k: 100 * (totals[(years[-1], k)] / totals[(years[0], k)] - 1)
             for k in order}
+    # Every figure the note states is computed here. This note said "93 per
+    # cent" and "AfDB and ADB fell" until 2026-09-24, both left over from
+    # before the AfDB envelope correction, which lowered AfDB's 2015 base.
+    first, last = years[0], years[-1]
+    net = {k: totals[(last, k)] - totals[(first, k)] for k in order}
+    two_share = 100 * (net["IFC"] + net["DFC"]) / sum(net.values())
+    fell = sorted(i for i in ALL_TEN
+                  if by_inst[(last, i)] < by_inst[(first, i)])
+    ifc_ex_trade = {y: sum(
+        amount for name, amount in conn.execute(
+            f"""SELECT project_name, amount_usd FROM projects
+                WHERE institution = 'IFC' AND amount_usd IS NOT NULL
+                  AND {YEAR} = ?""", (y,))
+        if not TRADE_FINANCE.search(name or "")) for y in (first, last)}
+    ifc_ex_trade_x = ifc_ex_trade[last] / ifc_ex_trade[first]
 
     fig, ax = rcfh.figure("tracker", height=13.5)
     rcfh.header(fig, "Strip out IFC and DFC and the decade is flat",
@@ -830,12 +857,15 @@ def growth_decomposition(conn, stamp):
                 fontfamily=rcfh.MONO, rotation=90, ha="left", va="top",
                 zorder=4)
 
+    fell_names = (", ".join(fell[:-1]) + " and " + fell[-1]
+                  if len(fell) > 1 else "".join(fell))
+    fell_text = (f"{fell_names} fell in nominal terms" if fell
+                 else "no institution fell in nominal terms")
     rcfh.notes(fig,
                f"IFC rose {lift['IFC']:.0f} per cent over the window and DFC "
                f"{lift['DFC']:.0f} per cent, against {lift[OTHER]:.0f} per cent "
-               "for the remaining eight combined, which US consumer prices alone "
-               "turn into a real-terms decline. Together IFC and DFC account for "
-               "93 per cent of the net rise; AfDB and ADB fell in nominal terms. "
+               "for the remaining eight combined. Together IFC and DFC account "
+               f"for {two_share:.0f} per cent of the net rise; {fell_text}. "
                "The brass rules mark authorising events, NOT a demonstrated "
                "cause: the BUILD Act raised DFC's exposure cap from USD 29bn to "
                "USD 60bn and the corporation stood up in December 2019, while "
@@ -844,12 +874,13 @@ def growth_decomposition(conn, stamp):
                "double annual investment to USD 48bn by 2030. DFC publishes no "
                "approval dates, so its years are US federal fiscal years running "
                "October to September, which places the BUILD Act at the opening "
-               "of its 2019. IFC's 2022 step carries two one-off global "
-               "supply-chain finance facilities worth USD 6.2bn between them; "
-               "excluding every trade-finance facility, IFC still grows 2.5 "
-               "times over the window, so the trend survives but that single "
-               "year is inflated. Commitments are a FLOOR on the coverage terms "
-               "stated across this series, and FMO is its own account only.",
+               "of its 2019. IFC's umbrella trade-finance programmes stamp the "
+               "whole programme's envelope on each partner-bank record; those "
+               "amounts are excluded as no bank's own participation. Excluding "
+               f"every trade-finance facility as well, IFC still grows "
+               f"{ifc_ex_trade_x:.1f} times over the window. Commitments are a "
+               "FLOOR on the coverage terms stated across this series, and FMO "
+               "is its own account only.",
                y=0.330)
     rcfh.source(fig, as_of=stamp)
     return rcfh.save(fig, OUT_DIR / "11_growth_decomposition.png")
@@ -1011,8 +1042,8 @@ OPERATIONS = f"""
 # nobody published.
 HOUSE_KEY = f"institution, lower(project_name), {YEAR}"
 
-# The two institutions that produced 93 per cent of the decade's growth
-# (exhibit 11). Exhibit 13 exists because both are infrastructure-light, so
+# The two institutions that produced most of the decade's growth (exhibit 11
+# computes the share). Exhibit 13 exists because both are infrastructure-light, so
 # their expansion moves the sector's SHARE without anyone committing less.
 GROWTH_PAIR = ("IFC", "DFC")
 
@@ -1058,6 +1089,26 @@ def infrastructure_share(conn, stamp):
               AND canonical_sector = ? AND institution NOT IN (?, ?)""",
         (RECENT_FROM, RECENT_TO, INFRA, *GROWTH_PAIR)).fetchone()
     rise = 100 * (lvl["last"] / lvl["first"] - 1)
+    # Computed, like the levels: this note said "a book that grew 5 per cent"
+    # until 2026-09-24, a figure from before the AfDB envelope correction that
+    # by then contradicted exhibit 11's 35 per cent for the same eight.
+    book_growth = 100 * (rows[-1]["total_eight"] / rows[0]["total_eight"] - 1)
+    infra_by = dict(((r["i"], r["y"]), r["v"]) for r in conn.execute(
+        f"""SELECT institution i, {YEAR} y, SUM(amount_usd) v FROM projects
+            WHERE {YEAR} IN (?, ?) AND amount_usd IS NOT NULL AND {OWN_ACCOUNT}
+              AND canonical_sector = ?
+            GROUP BY 1, 2""", (RECENT_FROM, RECENT_TO, INFRA)))
+    rose = sum(infra_by.get((i, RECENT_TO), 0) > infra_by.get((i, RECENT_FROM), 0)
+               for i in ALL_TEN)
+    NUMBER = {n: w for n, w in enumerate(
+        "no one two three four five six seven eight nine all".split())}
+    rose_text = ("all ten institutions" if rose == 10
+                 else f"{NUMBER[rose]} of the ten institutions")
+    fell_n = 10 - rose
+    retreat_text = ("no institution retreats from it" if fell_n == 0 else
+                    f"only {NUMBER[fell_n]} institution commits less to it"
+                    if fell_n == 1 else
+                    f"only {NUMBER[fell_n]} institutions commit less to it")
 
     order = ["All ten institutions", "Excluding IFC and DFC"]
     colors, labels = rcfh.by_group(order, order=order)
@@ -1096,20 +1147,19 @@ def infrastructure_share(conn, stamp):
     rcfh.notes(
         fig,
         f"The gap between the lines carries the finding. Infrastructure "
-        f"commitments ROSE over the window at nine of the ten institutions; "
+        f"commitments ROSE over the window at {rose_text}; "
         f"the eight outside "
         f"IFC and DFC took theirs from USD {lvl['first']:,.1f}bn to USD "
         f"{lvl['last']:,.1f}bn, a rise of {rise:.0f} per cent, on a book that "
-        f"grew 5 per cent, and their infrastructure share climbs from "
+        f"grew {book_growth:.0f} per cent, and their infrastructure share climbs from "
         f"{eight[0]:.0f} to {eight[-1]:.0f} per cent. The whole-panel line "
         f"goes the other way, {all_ten[0]:.0f} to {all_ten[-1]:.0f} per cent, "
         "because IFC and DFC tripled over the same decade and both run "
         "infrastructure-light books, so the sector's share falls "
-        "arithmetically while no institution retreats from it. Exhibit 11 "
-        "carries that growth decomposition. Two smaller cautions: 2022 is "
-        "further depressed by two one-off IFC supply-chain finance facilities "
-        "worth USD 6.2bn, which lift the denominator alone, and DFC publishes "
-        "no approval dates, so its years are US federal fiscal years. Sectors "
+        f"arithmetically while {retreat_text}. Exhibit 11 "
+        "carries that growth decomposition. One smaller caution: DFC "
+        "publishes no approval dates, so its years are US federal fiscal "
+        "years. Sectors "
         "are harmonised from ten source taxonomies and deals with no source "
         "sector are excluded rather than assigned.", y=0.305)
     rcfh.source(fig, as_of=stamp)
