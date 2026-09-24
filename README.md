@@ -35,6 +35,17 @@ Each loader **replaces** its institution's rows, so rerunning is always safe
 — no duplicates. Steps 2 and 3 must rerun after any load (loads reset their
 institution's canonical sectors and the duplicate groups).
 
+### Backups
+
+The database is not in git, so every script snapshots it automatically: the
+first time anything opens it on a given day, a copy goes to
+`../DFI Deal Tracker Backups/dfi_tracker_YYYY-MM-DD.db` **before** anything
+writes to it. The newest 14 are kept. To roll back, close everything that has
+the database open and copy the snapshot you want over `data/dfi_tracker.db`.
+The folder sits outside the repo on purpose: git treats an ignored file as
+expendable, and checking out an old commit (from before the database was
+untracked) silently overwrites `data/dfi_tracker.db` with that commit's copy.
+
 ## Dashboards
 
 There are two; they read the same database and show the same numbers.
@@ -251,6 +262,14 @@ Thematic **loans** are deliberately out of scope. See data_dictionary.md.
   [DB Browser for SQLite](https://sqlitebrowser.org/) and open
   `data/dfi_tracker.db` (read-only recommended: File → Open Database Read Only).
 - **Terminal:** `python verify.py` for the quick counts.
+- **Amount review:** `amount_review.xlsx` is a hand-check queue of the 215
+  records whose amounts matter most. It lists suspects first (trade-finance
+  lines, IFC 'World Region' records that kept a programme envelope, amounts
+  stamped identically on several records the same day), then the 200 largest,
+  then each institution's top five. Its 'Start here' tab is the instructions.
+  It holds the reviewer's decisions, so `python build_amount_review.py`
+  refuses to overwrite it (`--force` rebuilds and discards them). Nothing in
+  the database changes until the decisions are applied.
 
 ## Editing the sector, country, instrument or E&S taxonomies
 
@@ -378,9 +397,10 @@ python test_mobilisation.py
 python test_thematic_bonds.py
 python test_sovereign_exposure.py
 python test_afdb_amounts.py
+python test_backup.py
 ```
 
-Ten suites, one per mechanism — instruments are one-to-many into a
+Eleven suites, one per mechanism — instruments are one-to-many into a
 child table, E&S is one-to-one into a column, overrides are keyed per deal and
 replace rather than add, enrichment may only fill silence, and sovereign
 exposure is parsed at load time from a flag the source publishes — so a
@@ -392,8 +412,8 @@ reassigned, **enrichment never overwrites what a source published**, a
 the vocabulary stops the run, **an unexpected boolean encoding is refused
 rather than guessed at**, a rerun changes nothing, and editing a CSV
 actually takes effect. Each exits non-zero on failure, so they can gate a
-commit, and each builds a throwaway database in memory and never touches the
-real one.
+commit, and each builds a throwaway database and never touches the real one
+(`test_backup.py` also points the backup folder at a throwaway directory).
 
 Always analyze by `canonical_country` / `canonical_region` /
 `canonical_sector` — the raw `country` and `region` columns keep each

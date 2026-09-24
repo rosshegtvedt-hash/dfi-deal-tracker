@@ -10,13 +10,22 @@ Import from other modules to get a connection or log a data-quality issue:
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+import sys
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 # The database lives in /data next to the raw source files.
 # Path(__file__).parent = the folder this file is in, so paths work
 # no matter which directory you run the scripts from.
 DB_PATH = Path(__file__).parent / "data" / "dfi_tracker.db"
+
+# The database is not in git (too big, rebuilt by the pipeline), so these
+# snapshots are its only history besides OneDrive's. They sit OUTSIDE the
+# repo on purpose: a checkout can silently overwrite an ignored file inside
+# it, which is how the 2026-09-24 copy was lost. Newest BACKUPS_KEPT kept,
+# counted by file rather than by age so a month away doesn't empty the folder.
+BACKUP_DIR = Path(__file__).parent.parent / "DFI Deal Tracker Backups"
+BACKUPS_KEPT = 14
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS projects (
@@ -183,8 +192,53 @@ MIGRATIONS = [
 ]
 
 
+def backup_database(today: date | None = None) -> Path | None:
+    """Snapshot the database once per day, before anything writes to it.
+
+    Uses SQLite's backup API rather than a file copy, so the snapshot is
+    consistent even if another connection is mid-write. Returns the new
+    snapshot's path, or None when there was nothing to do (no database yet,
+    or today's snapshot already exists). A failure warns and returns None:
+    a full disk should not stop the pipeline, but it must not pass silently.
+    """
+    if not DB_PATH.exists():
+        return None
+    target = BACKUP_DIR / f"dfi_tracker_{(today or date.today()).isoformat()}.db"
+    if target.exists():
+        return None
+    partial = target.with_suffix(".db.partial")
+    try:
+        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+        src = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(partial)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        # Rename last, so an interrupted backup never looks like a good one.
+        partial.replace(target)
+        snapshots = sorted(BACKUP_DIR.glob("dfi_tracker_????-??-??.db"))
+        for old in snapshots[:-BACKUPS_KEPT]:
+            old.unlink()
+        return target
+    except (OSError, sqlite3.Error) as exc:
+        print(f"WARNING: database backup to {target} failed: {exc}",
+              file=sys.stderr)
+        try:
+            partial.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return None
+
+
 def get_connection() -> sqlite3.Connection:
-    """Open a connection, creating the database and schema if needed."""
+    """Open a connection, creating the database and schema if needed.
+
+    The first connection of each day snapshots the database first (see
+    backup_database), so every pipeline run has a copy of what it started from.
+    """
+    backup_database()
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # lets us access columns by name
