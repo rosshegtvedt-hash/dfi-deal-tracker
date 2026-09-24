@@ -77,6 +77,32 @@ def apply_dedupe(df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat([df[df["probable_duplicate_group"].isna()], df.loc[keep]])
 
 
+ASCII_LOWER = str.maketrans("ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+                            "abcdefghijklmnopqrstuvwxyz")
+
+
+def operation_stats(df: pd.DataFrame) -> dict:
+    """Operation count and per-OPERATION ticket sizes.
+
+    Mirror of HOUSE_KEY in export_charts.py: (institution, lower(name), year),
+    value summed. EIB Global discloses loan tranches, BII individual
+    transactions and EBRD split facilities, so a per-row figure divides one
+    cheque by its slices. An operation with no amount on any row still counts
+    as an operation; only a positive total enters the ticket sizes. SQLite's
+    lower() folds ASCII only, so this does too. Median is nearest rank, as
+    percentile() there: an interpolated value would name an amount nobody
+    committed.
+    """
+    names = df["project_name"].fillna("").str.translate(ASCII_LOWER)
+    ops = df.groupby([df["institution"], names, df["year"].fillna(-1)])[
+        "amount_usd"].sum(min_count=1)
+    values = sorted(ops[ops > 0])
+    return dict(
+        ops=len(ops), no_amount=int(ops.isna().sum()), priced=len(values),
+        median=values[len(values) // 2] if values else float("nan"),
+        mean=sum(values) / len(values) if values else float("nan"))
+
+
 def money(value: float) -> str:
     if pd.isna(value):
         return "—"
@@ -141,14 +167,25 @@ st.caption(
     f"as of {data_as_of} · cumulative disclosed operations (coverage periods "
     "differ by institution — see Data notes)")
 
-with_amount = view[view["amount_usd"].notna()]
-col1, col2, col3 = st.columns(3)
-col1.metric("Total commitments", money(with_amount["amount_usd"].sum()))
-col2.metric("Deals", f"{len(view):,}")
-col3.metric("Average ticket", money(with_amount["amount_usd"].mean()))
-if len(view) > len(with_amount):
-    st.caption(f"{len(view) - len(with_amount):,} deals have no disclosed "
-               "amount and are counted in deal totals but not in dollar figures.")
+ops = operation_stats(view)
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Total commitments", money(view["amount_usd"].sum()))
+col2.metric("Operations", f"{ops['ops']:,}")
+col2.caption(f"from {len(view):,} disclosed records")
+col3.metric("Median ticket", money(ops["median"]))
+col3.caption("per operation")
+col4.metric("Average ticket", money(ops["mean"]))
+col4.caption("per operation")
+note = ("An operation is one institution's commitment under one name in one "
+        "year. Some institutions disclose a single deal as several records "
+        "(EIB Global by loan tranche, BII by transaction), so records are "
+        "summed into operations before anything is counted or averaged. The "
+        "average sits well above the median because a few very large "
+        "operations pull it up.")
+if ops["no_amount"]:
+    note += (f" {ops['no_amount']:,} operations have no disclosed amount — "
+             "counted as operations but not in dollar figures.")
+st.caption(note)
 
 # ----------------------------------------------------------------- charts --
 alt.themes.enable("none")
@@ -269,7 +306,7 @@ st.dataframe(
         "source_url": st.column_config.LinkColumn("Disclosure", display_text="View"),
     },
 )
-st.caption(f"{len(table):,} deals shown.")
+st.caption(f"{len(table):,} records shown.")
 
 # ------------------------------------------------------------- data notes --
 with st.expander("Data notes"):

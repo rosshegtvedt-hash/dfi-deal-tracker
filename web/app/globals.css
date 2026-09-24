@@ -234,7 +234,7 @@ h2 { font-size: 15px; margin: 0 0 10px; color: var(--ink); }
 }
 
 .tiles {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
   margin-bottom: 12px;
 }
 .tile {
@@ -243,6 +243,7 @@ h2 { font-size: 15px; margin: 0 0 10px; color: var(--ink); }
 }
 .tile .label { color: var(--muted); font-size: 12px; margin-bottom: 2px; }
 .tile .value { font-size: 26px; font-weight: 650; }
+.tile .sub { color: var(--muted); font-size: 12px; margin-top: 2px; }
 .note { color: var(--muted); font-size: 12px; margin: 0 0 16px; }
 
 .card {
