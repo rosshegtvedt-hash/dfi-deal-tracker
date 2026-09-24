@@ -148,6 +148,35 @@ function MultiSelect({ label, options, selected, onChange }) {
   );
 }
 
+// Counts and ticket sizes are per OPERATION, not per row: EIB Global
+// discloses loan tranches, BII individual transactions and EBRD split
+// facilities, so one cheque can arrive as many rows. Mirror of HOUSE_KEY in
+// export_charts.py — (institution, lower(name), year), value summed. An
+// operation with no disclosed amount on any row still counts as an operation;
+// only those with a positive total enter the ticket sizes. SQLite's lower()
+// folds ASCII only, so this does too; toLowerCase() would merge names the
+// exhibits keep apart.
+const asciiLower = (s) => s.replace(/[A-Z]/g, (c) => c.toLowerCase());
+function operationStats(rows) {
+  const ops = new Map();
+  for (const r of rows) {
+    const key = `${r.institution}\u0001${asciiLower(r.name ?? "")}\u0001${r.year}`;
+    const prev = ops.get(key) ?? null;
+    ops.set(key, r.amount_usd == null ? prev : (prev ?? 0) + r.amount_usd);
+  }
+  const all = [...ops.values()];
+  const v = all.filter((x) => x != null && x > 0).sort((a, b) => a - b);
+  return {
+    ops: ops.size,
+    noAmount: all.filter((x) => x == null).length,
+    priced: v.length,
+    // Nearest rank, as percentile() in export_charts.py: an interpolated
+    // median would name an amount nobody committed.
+    median: v.length ? v[v.length >> 1] : null,
+    mean: v.length ? v.reduce((s, x) => s + x, 0) / v.length : null,
+  };
+}
+
 // Mirror of the pipeline's dedupe rule: keep each probable co-financing
 // group's largest single commitment so one deal counts once.
 function excludeDuplicates(rows) {
@@ -215,13 +244,8 @@ export default function Page() {
       yearFrom, yearTo, includeUndated, excludeDupes]);
 
   const stats = useMemo(() => {
-    const amounts = view.filter((r) => r.amount_usd != null);
-    const total = amounts.reduce((s, r) => s + r.amount_usd, 0);
-    return {
-      total, deals: view.length,
-      avg: amounts.length ? total / amounts.length : null,
-      noAmount: view.length - amounts.length,
-    };
+    const total = view.reduce((s, r) => s + (r.amount_usd ?? 0), 0);
+    return { total, records: view.length, ...operationStats(view) };
   }, [view]);
 
   const byYear = useMemo(() => {
@@ -348,20 +372,32 @@ export default function Page() {
           <div className="value">{fmtUSD(stats.total)}</div>
         </div>
         <div className="tile">
-          <div className="label">Deals</div>
-          <div className="value">{stats.deals.toLocaleString()}</div>
+          <div className="label">Operations</div>
+          <div className="value">{stats.ops.toLocaleString()}</div>
+          <div className="sub">from {stats.records.toLocaleString()} disclosed records</div>
+        </div>
+        <div className="tile">
+          <div className="label">Median ticket</div>
+          <div className="value">{fmtUSD(stats.median)}</div>
+          <div className="sub">per operation</div>
         </div>
         <div className="tile">
           <div className="label">Average ticket</div>
-          <div className="value">{fmtUSD(stats.avg)}</div>
+          <div className="value">{fmtUSD(stats.mean)}</div>
+          <div className="sub">per operation</div>
         </div>
       </div>
-      {stats.noAmount > 0 && (
-        <p className="note">
-          {stats.noAmount.toLocaleString()} deals have no disclosed amount — counted in deal
-          totals but not in dollar figures.
-        </p>
-      )}
+      <p className="note">
+        An operation is one institution&apos;s commitment under one name in one year. Some
+        institutions disclose a single deal as several records (EIB Global by loan tranche,
+        BII by transaction), so records are summed into operations before anything is
+        counted or averaged. The average sits well above the median because a few very
+        large operations pull it up.
+        {stats.noAmount > 0 && (
+          <> {stats.noAmount.toLocaleString()} operations have no disclosed amount — counted
+          as operations but not in dollar figures.</>
+        )}
+      </p>
 
       <div className="card">
         <h2>Commitments over time (US$ bn)</h2>
@@ -469,7 +505,7 @@ export default function Page() {
           </p>
         </div>
         <p className="note">
-          Showing {Math.min(TABLE_LIMIT, tableRows.length)} of {tableRows.length.toLocaleString()} deals
+          Showing {Math.min(TABLE_LIMIT, tableRows.length)} of {tableRows.length.toLocaleString()} records
           {tableRows.length > TABLE_LIMIT ? " — refine filters or search to narrow down." : "."}
         </p>
       </div>
