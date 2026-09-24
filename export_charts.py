@@ -291,9 +291,13 @@ def cofinancing_pairs(conn, stamp):
     import collections
     import itertools
     groups = collections.defaultdict(set)
+    # FMO's own account only, as the source line states and every other
+    # exhibit applies. Until 2026-09-24 this query had no filter, so the Dutch
+    # government funds FMO administers inflated every FMO pair (BII + FMO 78
+    # against 57 own-account).
     for r in conn.execute(
             "SELECT probable_duplicate_group g, institution i FROM projects "
-            "WHERE probable_duplicate_group IS NOT NULL"):
+            f"WHERE probable_duplicate_group IS NOT NULL AND {OWN_ACCOUNT}"):
         groups[r["g"]].add(r["i"])
     pairs = collections.Counter()
     for insts in groups.values():
@@ -311,7 +315,11 @@ def cofinancing_pairs(conn, stamp):
                 exhibit="05")
     rcfh.coverage(fig, included=ALL_TEN)
     fig.subplots_adjust(left=0.30)
-    ax.barh(range(len(values)), values, color=rcfh.by_rank(values),
+    # Ties broken by position, higher bar deeper: by_rank alone gives a tie
+    # to the LOWER bar (the list runs bottom-up), which reads as a break in
+    # the ramp.
+    ax.barh(range(len(values)), values,
+            color=rcfh.by_rank([(v, i) for i, v in enumerate(values)]),
             height=0.66, zorder=3)
     ax.set_yticks(range(len(labels)))
     ax.set_yticklabels(labels)
